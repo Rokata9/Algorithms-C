@@ -1,0 +1,34 @@
+{
+  "folders": [
+    {
+      "name": "algorithms",
+      "path": "."
+    }
+  ],
+  "settings": {
+    "files.associations": {
+      "*.h": "c",
+      "*.c": "c"
+    },
+    "C_Cpp.default.cStandard": "c17",
+    "C_Cpp.default.compilerPath": "/usr/bin/clang",
+    "C_Cpp.default.includePath": [
+      "${workspaceFolder}",
+      "${workspaceFolder}/**"
+    ],
+    "code-runner.runInTerminal": true,
+    "code-runner.saveFileBeforeRun": true,
+    "code-runner.ignoreSelection": true,
+    "code-runner.executorMap": {
+      "c": "\"$workspaceRoot/scripts/run.sh\" \"$fullFileName\""
+    }
+  },
+  "extensions": {
+    "recommendations": [
+      "ms-vscode.cpptools",
+      "vadimcn.vscode-lldb",
+      "formulahendry.code-runner",
+      "ms-vscode.makefile-tools"
+    ]
+  }
+}

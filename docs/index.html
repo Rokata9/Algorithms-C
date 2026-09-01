@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Shortest routes, without sorting a giant list</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650&family=Source+Code+Pro:wght@400;600&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="progress" id="progress"></div>
+  <div class="layout">
+    <nav class="toc" aria-label="Sections">
+      <p class="brand">Shortest routes without a giant sorted list</p>
+      <p class="brand-sub">A 2025 idea, taught from zero</p>
+      <p class="toc-group">The job</p>
+      <ol>
+        <li><a href="#how">How to read this</a></li>
+        <li><a href="#job">What we want</a></li>
+        <li><a href="#map">A map is dots and arrows</a></li>
+        <li><a href="#guess">Best guess vs locked in</a></li>
+      </ol>
+      <p class="toc-group">The old way</p>
+      <ol>
+        <li><a href="#dijkstra">Always pick the nearest</a></li>
+        <li><a href="#waiting">The expensive waiting list</a></li>
+        <li><a href="#shout">The shouting method</a></li>
+      </ol>
+      <p class="toc-group">The new way</p>
+      <ol>
+        <li><a href="#idea">The new recipe</a></li>
+        <li><a href="#hubs">Find the busy intersections</a></li>
+        <li><a href="#groups">Handle a group, not one place</a></li>
+        <li><a href="#pile">A pile, not a ranked list</a></li>
+        <li><a href="#flow">The whole loop</a></li>
+        <li><a href="#walk">Watch it on our map</a></li>
+        <li><a href="#recipe">The recipe in English</a></li>
+      </ol>
+      <p class="toc-group">Then write C</p>
+      <ol>
+        <li><a href="#honest">Will this beat GPS?</a></li>
+        <li><a href="#c-plan">What to type, in order</a></li>
+        <li><a href="#traps">Mistakes that break it</a></li>
+        <li><a href="#quiz">Check yourself</a></li>
+        <li><a href="#dictionary">Paper words, translated</a></li>
+        <li><a href="#sources">Where this came from</a></li>
+      </ol>
+      <div class="topbar">
+        <button type="button" id="themeBtn" title="Toggle color theme">Theme</button>
+        <button type="button" id="resetBtn" title="Clear saved ticks">Reset ticks</button>
+      </div>
+    </nav>
+
+    <main id="main">
+      <header class="hero">
+        <p class="kicker">You can write C. You have not taken an algorithms class. That is enough.</p>
+        <h1>You can know how far every place is without ranking the places in order.</h1>
+        <p class="lede">
+          Imagine a city map. You stand at one café. You want the travel time from that café
+          to every other place. Not the route drawn on a map — just the numbers.
+          For decades the standard computer method always handled the closest unfinished
+          place next. That forces the computer to keep a giant “who is nearest?” list in order.
+          In 2025 a team led from Tsinghua University showed you can skip that ranking
+          and still get every number right. This page teaches that idea slowly.
+        </p>
+        <div class="meta">
+          <span class="chip">No C code to copy</span>
+          <span class="chip">One-way streets are allowed</span>
+          <span class="chip">Travel times are never negative</span>
+        </div>
+      </header>
+
+      <section id="how">
+        <h2><span class="num">1.</span> How to read this</h2>
+        <p>Read top to bottom the first time. Press <strong>Next</strong> on every picture that has it. The pictures do the teaching. The text is there so the picture is not a mystery.</p>
+        <div class="grid-2">
+          <div class="card">
+            <h3>Yellow boxes</h3>
+            <p>The idea that actually matters. If you only remember those, you can still explain the algorithm to someone else.</p>
+          </div>
+          <div class="card">
+            <h3>Blue boxes</h3>
+            <p>The same idea as a C programmer would store it: arrays, loops, structs. Not code you can paste. A hint for later.</p>
+          </div>
+        </div>
+        <p>Words in grey “optional” flaps are extra. Skip them. They are for later, when the main story already makes sense.</p>
+      </section>
+
+      <section id="job">
+        <h2><span class="num">2.</span> The job</h2>
+        <p>You are given:</p>
+        <ul>
+          <li>A bunch of <strong>places</strong> (a café, a bridge, a station…).</li>
+          <li>One-way <strong>roads</strong> between some of them. Each road has a <strong>travel time</strong> that is zero or bigger. Never negative.</li>
+          <li>One <strong>start</strong> place. We will call it <code>s</code> because every textbook does. It is just a name.</li>
+        </ul>
+        <p>You must fill an array with one number per place: the smallest total travel time from <code>s</code> to that place.</p>
+        <p>You do <em>not</em> have to list the places from nearest to farthest. You only need the numbers. That sentence is the whole plot of this page.</p>
+        <div class="def">
+          <strong>What “shortest” means here</strong>
+          Not fewest roads. Smallest <em>sum of travel times</em>. A route with three short roads can beat a route with one long road.
+        </div>
+      </section>
+
+      <section id="map">
+        <h2><span class="num">3.</span> Our toy map</h2>
+        <p>We will use the same six places for every demo. Start is green. Arrows are one-way. Red numbers are travel times.</p>
+        <div class="figure" aria-label="A tiny directed map from s to e">
+          <svg viewBox="0 0 640 280" role="img">
+            <defs>
+              <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+                <path d="M0,0 L8,4 L0,8 z" fill="#5e5348"></path>
+              </marker>
+            </defs>
+            <line x1="90" y1="140" x2="200" y2="60" stroke="#5e5348" stroke-width="2" marker-end="url(#arrow)" />
+            <line x1="90" y1="140" x2="200" y2="220" stroke="#5e5348" stroke-width="2" marker-end="url(#arrow)" />
+            <line x1="230" y1="220" x2="230" y2="78" stroke="#5e5348" stroke-width="2" marker-end="url(#arrow)" />
+            <line x1="258" y1="52" x2="372" y2="52" stroke="#5e5348" stroke-width="2" marker-end="url(#arrow)" />
+            <line x1="258" y1="228" x2="372" y2="228" stroke="#5e5348" stroke-width="2" marker-end="url(#arrow)" />
+            <line x1="248" y1="210" x2="382" y2="70" stroke="#5e5348" stroke-width="2" marker-end="url(#arrow)" />
+            <line x1="400" y1="78" x2="400" y2="202" stroke="#5e5348" stroke-width="2" marker-end="url(#arrow)" />
+            <line x1="418" y1="52" x2="532" y2="124" stroke="#5e5348" stroke-width="2" marker-end="url(#arrow)" />
+            <line x1="418" y1="228" x2="532" y2="156" stroke="#5e5348" stroke-width="2" marker-end="url(#arrow)" />
+            <text x="140" y="88" fill="#b4451e" font-size="14">4</text>
+            <text x="130" y="200" fill="#b4451e" font-size="14">2</text>
+            <text x="236" y="150" fill="#b4451e" font-size="14">1</text>
+            <text x="300" y="42" fill="#b4451e" font-size="14">5</text>
+            <text x="300" y="250" fill="#b4451e" font-size="14">10</text>
+            <text x="340" y="170" fill="#b4451e" font-size="14">8</text>
+            <text x="408" y="150" fill="#b4451e" font-size="14">2</text>
+            <text x="490" y="70" fill="#b4451e" font-size="14">6</text>
+            <text x="490" y="220" fill="#b4451e" font-size="14">3</text>
+            <circle cx="70" cy="140" r="22" fill="#2c6a4f" />
+            <circle cx="230" cy="52" r="22" fill="#fffdf8" stroke="#241c14" stroke-width="2" />
+            <circle cx="230" cy="228" r="22" fill="#fffdf8" stroke="#241c14" stroke-width="2" />
+            <circle cx="400" cy="52" r="22" fill="#fffdf8" stroke="#241c14" stroke-width="2" />
+            <circle cx="400" cy="228" r="22" fill="#fffdf8" stroke="#241c14" stroke-width="2" />
+            <circle cx="550" cy="140" r="22" fill="#fffdf8" stroke="#241c14" stroke-width="2" />
+            <text x="70" y="145" text-anchor="middle" fill="#fff" font-size="16">s</text>
+            <text x="230" y="57" text-anchor="middle" font-size="16">a</text>
+            <text x="230" y="233" text-anchor="middle" font-size="16">b</text>
+            <text x="400" y="57" text-anchor="middle" font-size="16">c</text>
+            <text x="400" y="233" text-anchor="middle" font-size="16">d</text>
+            <text x="550" y="145" text-anchor="middle" font-size="16">e</text>
+          </svg>
+          <p class="caption">From s to a you can go directly (time 4) or via b (time 2 + 1 = 3). The answer for a is 3, the cheaper of those.</p>
+        </div>
+        <p>The answers for this map, which we will keep coming back to:</p>
+        <table>
+          <thead><tr><th>place</th><th>cheapest time from s</th><th>one cheapest route</th></tr></thead>
+          <tbody>
+            <tr><td>s</td><td>0</td><td>—</td></tr>
+            <tr><td>b</td><td>2</td><td>s → b</td></tr>
+            <tr><td>a</td><td>3</td><td>s → b → a</td></tr>
+            <tr><td>c</td><td>8</td><td>s → b → a → c</td></tr>
+            <tr><td>d</td><td>10</td><td>s → b → a → c → d</td></tr>
+            <tr><td>e</td><td>13</td><td>s → b → a → c → d → e</td></tr>
+          </tbody>
+        </table>
+        <div class="chint">
+          <strong>In C, this map is boring data</strong>
+          An array of places. For each place, a short list of outgoing roads: “to this neighbour, with this time.” That structure is called an adjacency list. You have probably written something like it for a social graph or a game map.
+        </div>
+      </section>
+
+      <section id="guess">
+        <h2><span class="num">4.</span> Two numbers per place</h2>
+        <p>While the algorithm runs, each place has a <strong>best guess so far</strong>. At the start:</p>
+        <ul>
+          <li>Start place: guess = 0 (you are already there).</li>
+          <li>Everyone else: guess = “huge” (we have no route yet). In C you use a big sentinel, like <code>INT_MAX</code> or a <code>double</code> infinity.</li>
+        </ul>
+        <p>Whenever you already have a guess for place <code>u</code>, a road from <code>u</code> to <code>v</code> with time <code>w</code> suggests a new guess for <code>v</code>:</p>
+        <pre>new_guess_for_v = guess[u] + w</pre>
+        <p>If that is cheaper than the guess you already had for <code>v</code>, replace it. People call this <strong>offering a road</strong>, or in textbooks, <em>relaxing</em> the road. Same thing: “maybe this road is a better deal.”</p>
+        <p>A guess becomes <strong>locked in</strong> when the algorithm decides it will never get cheaper. After that, the number is the answer for that place and we never change it. The exact test Dijkstra uses is in the next section — it is not “the guess looks right.”</p>
+        <div class="insight">
+          <strong>Remember just this</strong>
+          Best guess can only go down. Locked in never changes. A place can already have the true cheapest time and still be waiting. Guess being correct and place being locked in are two different events.
+        </div>
+      </section>
+
+      <section id="dijkstra">
+        <h2><span class="num">5.</span> The standard method: always lock the nearest leftover place</h2>
+        <p>This is Dijkstra’s method. Named after Edsger Dijkstra, 1950s. Almost every GPS-style textbook starts here.</p>
+        <p>There are only two kinds of step. They alternate. Locking only happens in the first kind.</p>
+        <div class="grid-2">
+          <div class="card">
+            <h3>PICK</h3>
+            <p>Look at the waiting list. Take the place with the smallest guess. <strong>Lock that place in.</strong> This is the only moment a place becomes locked in. Then we start offering that place’s roads.</p>
+          </div>
+          <div class="card">
+            <h3>OFFER</h3>
+            <p>Look at one road out of the place we just locked. If it gives a neighbour a cheaper guess, update that neighbour on the waiting list. <strong>Nobody is locked in during an offer.</strong> We do every remaining road of that place before the next pick.</p>
+          </div>
+        </div>
+        <p>The waiting list is a <strong>priority queue</strong> (in C, usually a binary heap): closest guess at the top. “Reordered” only means a guess got cheaper, so that place moves closer to the top. It does not mean we lock it.</p>
+        <div class="def">
+          <strong>The lock-in test, exactly</strong>
+          A leftover place is locked in when it is at the top of the waiting list <em>and</em> we are in a PICK step. Why that is safe: every leftover place is at least as far as this one, and extra roads only add more time, so no unfinished route can beat this guess. Having the true number already is <em>not</em> the test. After we lock b, a’s guess becomes 3 (the real answer) while we are still offering b’s other roads. a stays gold until the next PICK.
+        </div>
+        <p>Press <strong>Next</strong>. Watch the list on the right. Gold on the map = on that list. Green = already locked. The top of the list is who the next PICK will take — after the current offers finish.</p>
+        <div class="figure">
+          <div class="stepper-bar">
+            <button type="button" id="dijPrev">Back</button>
+            <button type="button" class="primary" id="dijNext">Next</button>
+            <button type="button" id="dijReset">Reset</button>
+            <span class="status" id="dijStatus">Step 0</span>
+          </div>
+          <div class="dij-layout">
+            <svg id="dijSvg" viewBox="0 0 640 300" role="img" aria-label="Dijkstra stepper"></svg>
+            <div class="dij-side">
+              <h4>What this step is</h4>
+              <div class="dij-action" id="dijAction">—</div>
+              <h4>Locked in (finish order)</h4>
+              <ol class="locked-seq" id="dijLocked"></ol>
+              <p class="dij-empty" id="dijLockedEmpty">Nobody yet.</p>
+              <h4>Waiting list — closest at the top</h4>
+              <p class="dij-empty">Priority queue. Top item is the next PICK, but only after we finish offering roads from the place we just locked.</p>
+              <ol class="pq" id="dijWait"></ol>
+              <p class="dij-empty" id="dijUnreached"></p>
+            </div>
+          </div>
+          <div class="legend">
+            <span><i class="swatch" style="background:#2c6a4f"></i>locked in</span>
+            <span><i class="swatch" style="background:#c9a227"></i>on the waiting list</span>
+            <span><i class="swatch" style="background:#fffdf8;border:1px solid #241c14"></i>not reached yet</span>
+            <span><i class="swatch" style="background:#b4451e"></i>road we just offered</span>
+            <span>number under a place = best guess; ? means none yet</span>
+          </div>
+          <p class="caption" id="dijCaption">Press Next.</p>
+          <div class="note" id="dijWhy"></div>
+        </div>
+        <div class="try">
+          <strong>The step people get stuck on</strong>
+          After b is locked, we offer b→a and a’s guess becomes 3. Then we still offer b→c and b→d. During those two offers a is waiting, even though no more roads into a will ever help, and even though 3 is already the true time. We are not allowed to PICK in the middle of offering b’s roads. The next PICK is the step after b’s last road. That is when a turns green — not because a new arrow arrived, because a was then the closest leftover.
+        </div>
+        <pre><span class="cmt">// Dijkstra. Locking is only the line that takes the closest leftover.</span>
+guess[s] = 0
+guess[everyone else] = HUGE
+waiting = a priority queue  <span class="cmt">// closest guess at the top</span>
+put s on waiting
+
+while waiting is not empty:
+    u = pop the closest place from waiting      <span class="cmt">// PICK — lock u in here</span>
+    lock u in
+    for each road u → v with time w:            <span class="cmt">// OFFER — no locking in this loop</span>
+        if guess[u] + w is cheaper than guess[v]:
+            guess[v] = guess[u] + w
+            if v is already on waiting:
+                move v toward the top           <span class="cmt">// "reorder": cheaper guess, closer to top</span>
+            else:
+                put v on waiting
+</pre>
+        <div class="chint">
+          <strong>Write this in C first</strong>
+          Even though it is not the new algorithm. You need a correct checker. A binary heap of place ids is a waiting list that can grab the smallest guess quickly. Later you will run your new code and this code on the same maps and demand identical numbers.
+        </div>
+      </section>
+
+      <section id="waiting">
+        <h2><span class="num">6.</span> Why that waiting list is expensive</h2>
+        <p>Look at the loop. Every single place, we ask: “who on the waiting list is smallest right now?”</p>
+        <p>That is the same kind of work as keeping a list of names in alphabetical order, or keeping high scores sorted. Each time you insert or pull the top item, you pay extra comparisons. Do that for every place, and the extra work grows faster than just looking at each place once.</p>
+        <p>People call this extra cost “like sorting.” Not because the algorithm prints a ranked table, but because it is constantly maintaining order on that waiting list.</p>
+        <div class="figure">
+          <svg viewBox="0 0 720 200" role="img" aria-label="Ranked list vs a bag of numbers">
+            <rect x="20" y="24" width="320" height="152" rx="12" fill="#f3e3c0" stroke="#c4892a" />
+            <text x="180" y="52" text-anchor="middle" font-size="15">What Dijkstra also produces</text>
+            <text x="48" y="88" font-size="15">1st  b = 2</text>
+            <text x="48" y="112" font-size="15">2nd  a = 3</text>
+            <text x="48" y="136" font-size="15">3rd  c = 8</text>
+            <text x="48" y="160" font-size="15">…a ranking of every place</text>
+            <rect x="380" y="24" width="320" height="152" rx="12" fill="#d5eadc" stroke="#2c6a4f" />
+            <text x="540" y="52" text-anchor="middle" font-size="15">What the job actually asked</text>
+            <text x="408" y="92" font-size="15">a=3   b=2   c=8</text>
+            <text x="408" y="120" font-size="15">d=10  e=13  s=0</text>
+            <text x="408" y="156" font-size="15">just an array, any order</text>
+          </svg>
+          <p class="caption">Left: a leaderboard. Right: a table of numbers. Same information about times. The leaderboard is extra.</p>
+        </div>
+        <div class="insight">
+          <strong>The crack in the old method</strong>
+          If you insist on always locking the globally nearest leftover place, you are building that leaderboard whether you wanted it or not. To go faster, you must sometimes lock a place that is <em>not</em> the closest leftover one. The numbers still have to come out right. The order you finish them can be a bit scrambled.
+        </div>
+        <p>That is all “breaking the sorting barrier” means. Not a physics barrier. A habit: we thought shortest-routes had to rank places. They don’t, if you only need the array.</p>
+      </section>
+
+      <section id="shout">
+        <h2><span class="num">7.</span> Another old method: everyone shouts, no waiting list</h2>
+        <p>There is a second classic method (Bellman–Ford). It does not keep a sorted waiting list at all.</p>
+        <p>The rule: offer <em>every</em> road, then do it again, then again. After 1 round, every cheapest route that uses at most 1 road is correct. After 2 rounds, routes of at most 2 roads are correct. And so on.</p>
+        <p>No ranking. The cost is: you look at every road, many times. If you repeat as many times as there are places, this is slower than Dijkstra. If you only repeat a <em>few</em> times, it is a cheap scout.</p>
+        <div class="figure">
+          <div class="stepper-bar">
+            <button type="button" id="bfPrev">Back</button>
+            <button type="button" class="primary" id="bfNext">Next</button>
+            <button type="button" id="bfReset">Reset</button>
+            <span class="status" id="bfStatus">Round 0</span>
+          </div>
+          <svg id="bfSvg" viewBox="0 0 640 300" role="img" aria-label="Shouting stepper"></svg>
+          <p class="caption" id="bfCaption">Each Next is one shout-round: every place that already has a guess offers its roads.</p>
+        </div>
+        <pre><span class="cmt">// A few shout-rounds. No sorted list anywhere.</span>
+guess[s] = 0
+guess[everyone else] = HUGE
+repeat a small number of times:
+    for each road u → v with time w:
+        if guess[u] + w is cheaper than guess[v]:
+            guess[v] = guess[u] + w
+</pre>
+        <div class="warn">
+          <strong>This looks like the “dumb” method. That is useful.</strong>
+          Full shouting is slow. The 2025 algorithm only shouts a handful of times, on purpose, as a probe: “after two shouts, which places still have a crowd hanging off them?” Those crowded places are the busy intersections. Coming next.
+        </div>
+      </section>
+
+      <section id="idea">
+        <h2><span class="num">8.</span> The new recipe, in four kitchen steps</h2>
+        <p>Still working outward from the start, like Dijkstra. But we refuse to keep the whole waiting list fully ranked.</p>
+        <ol>
+          <li><strong>Look at the current boundary</strong> — places we can reach that are not all locked in yet.</li>
+          <li><strong>Shout a few times</strong> from that boundary. Short detours get locked in for free. What is left tends to hang off a few busy intersections.</li>
+          <li><strong>Keep only those busy intersections</strong> as the people we will expand from. Throw the quiet boundary places back in a later pile.</li>
+          <li><strong>Take a small group of the closest busy ones</strong> — not the single closest, a handful — and repeat the whole recipe on that smaller job. Then the next handful. Then the side streets.</li>
+        </ol>
+        <div class="figure">
+          <svg viewBox="0 0 720 210" role="img" aria-label="High level idea">
+            <defs>
+              <marker id="arrow2" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+                <path d="M0,0 L8,4 L0,8 z" fill="#5e5348"></path>
+              </marker>
+            </defs>
+            <rect x="16" y="40" width="150" height="90" rx="12" fill="#d5eadc" stroke="#2c6a4f" />
+            <text x="91" y="78" text-anchor="middle" font-size="14">already sure</text>
+            <text x="91" y="100" text-anchor="middle" font-size="12" fill="#5e5348">locked in</text>
+            <rect x="200" y="28" width="200" height="114" rx="12" fill="#f3e3c0" stroke="#c4892a" />
+            <text x="300" y="58" text-anchor="middle" font-size="14">the boundary</text>
+            <circle cx="250" cy="100" r="14" fill="#2c6a4f" />
+            <circle cx="290" cy="100" r="14" fill="#c9a227" />
+            <circle cx="330" cy="100" r="14" fill="#c9a227" />
+            <circle cx="370" cy="100" r="14" fill="#c9a227" />
+            <text x="250" y="104" text-anchor="middle" fill="#fff" font-size="10">hub</text>
+            <rect x="440" y="40" width="250" height="90" rx="12" fill="#fffdf8" stroke="#9a9086" />
+            <text x="565" y="78" text-anchor="middle" font-size="14">still unknown</text>
+            <text x="565" y="100" text-anchor="middle" font-size="12" fill="#5e5348">must go through the boundary</text>
+            <path d="M166,85 L200,85" stroke="#241c14" marker-end="url(#arrow2)" />
+            <text x="360" y="172" text-anchor="middle" font-size="13">Keep the hubs. Handle them in small groups. Come back for the rest.</text>
+          </svg>
+          <p class="caption">Dijkstra would rank every gold place. The new method ranks almost none of them. It only cares about the green hub.</p>
+        </div>
+        <div class="insight">
+          <strong>Two savings, stacked</strong>
+          First: most boundary places are not hubs, so you stop babysitting them. Second: when you do pick from the remaining pile, you grab a handful of “pretty close” places instead of hunting for the single closest every time. Hunting for one minimum in a huge list is the sorting-shaped cost. Asking for a handful is cheaper.
+        </div>
+      </section>
+
+      <section id="hubs">
+        <h2><span class="num">9.</span> How to find a hub</h2>
+        <p>Take the current boundary. Shout a tiny number of times — on a real huge map this number is still 2 or 3. Call that number “how many shouts,” or later, <code>k</code>.</p>
+        <p>Then look at who you touched.</p>
+        <div class="grid-2">
+          <div class="card">
+            <h3>Case A — you already reached a crowd</h3>
+            <p>If the boundary is already small compared with how many places you just touched, you are done shrinking. The whole boundary can act as hubs. There is nothing extra to do.</p>
+          </div>
+          <div class="card">
+            <h3>Case B — you only reached a few</h3>
+            <p>Then cheap short detours are already locked in. Whatever is still unfinished hangs off a few places whose “family tree” of current best routes is large. Those roots are the hubs. There cannot be many of them: each one “owns” at least <code>k</code> places, and places are not shared.</p>
+          </div>
+        </div>
+        <p>Press Next. We use a toy “2 shouts” so you can see a round happen. On six places the crowd case (A) fires immediately. That is honest, not a bug. The last step tells you what case B would have done.</p>
+        <div class="figure">
+          <div class="stepper-bar">
+            <button type="button" id="pvPrev">Back</button>
+            <button type="button" class="primary" id="pvNext">Next</button>
+            <button type="button" id="pvReset">Reset</button>
+            <span class="status" id="pvStatus">Step 0</span>
+          </div>
+          <svg id="pvSvg" viewBox="0 0 640 320" role="img" aria-label="Hub finding stepper"></svg>
+          <p class="caption" id="pvCaption">Toy setting: 2 shouts from s. Watch guesses update, then the decision: already a crowd, or inspect family trees?</p>
+        </div>
+        <div class="tabs" role="tablist">
+          <button type="button" class="tab" data-pane="pv-en" aria-selected="true">English</button>
+          <button type="button" class="tab" data-pane="pv-ps">As a function</button>
+        </div>
+        <div id="pv-en" class="pane">
+          <div class="note">
+            <strong>Find hubs</strong>
+            Start from the boundary. For a few rounds, offer outgoing roads, but ignore anything past a time limit you were given. Collect everyone you touched. If that collection is already a crowd compared with the boundary, return the whole boundary as hubs. If not, follow each place’s “I got my guess from this parent” pointer, build those family trees, and keep only roots whose tree is big.
+          </div>
+        </div>
+        <div id="pv-ps" class="pane" hidden>
+<pre><span class="fn">FIND-HUBS</span>(time_limit, boundary):
+    touched = copy of boundary
+    layer = boundary
+    repeat k times:                         <span class="cmt">// k is "how many shouts"</span>
+        next_layer = empty
+        for each road out of a place in layer:
+            offer that road
+            if the neighbour's new guess is still under time_limit:
+                add neighbour to next_layer and to touched
+        if touched is already a crowd compared with boundary:
+            return boundary as the hubs
+        layer = next_layer
+    look at parent-pointers inside touched
+    hubs = boundary places whose family tree has at least k places
+    return hubs
+</pre>
+        </div>
+        <div class="chint">
+          <strong>In C</strong>
+          <code>touched</code> is an array of ids plus a boolean “already listed” so you do not push duplicates. The family tree is just an array <code>parent[place]</code> you already update when a guess improves. Count tree sizes with a walk from the leaves, or a DFS. Each place has only a few outgoing roads if you store the map normally.
+        </div>
+      </section>
+
+      <section id="groups">
+        <h2><span class="num">10.</span> Why we recurse, and why we stop early</h2>
+        <p>After you have hubs, you still should not sort them all. You put them on a pile (next section) and repeat:</p>
+        <ol>
+          <li>Grab a <strong>group</strong> of the closest hubs — a handful, not one.</li>
+          <li>Solve the same kind of job for that group, with a tighter time limit (“only finish people who are about this close”).</li>
+          <li>That smaller job is the same function calling itself on a smaller piece. That is all “recursion” means here. A loop with a stack would do the same.</li>
+          <li>When the smaller job returns, offer roads out of the places it locked in. Newly improved neighbours go back on the pile.</li>
+          <li>If the pile is empty, you finished everything under the original time limit. If you have already locked in a lot of places, <strong>stop anyway</strong> and tell the caller “I did the closest chunk; here is a new, smaller time limit.” The caller will grab another group. That early stop is not a failure. It keeps each job a manageable size.</li>
+        </ol>
+        <div class="insight">
+          <strong>Smaller job, closer places</strong>
+          Each recursive call only cares about a nearer slice of remaining times. Sibling groups do not overlap. Earlier groups are the closer places. That is how the method still moves outward from the start, just not one-by-one.
+        </div>
+      </section>
+
+      <section id="pile">
+        <h2><span class="num">11.</span> The pile is not a high-score table</h2>
+        <p>A normal heap is built to answer one question well: “what is the single smallest item?” Dijkstra asks that question constantly. We ask a weaker question:</p>
+        <p><em>“Give me about M of the smallest items, and a cutoff number that separates them from whatever is left.”</em></p>
+        <p>Weaker questions can be cheaper. You do not keep every item in total order. You keep them in <strong>blocks</strong> of about M items. Blocks themselves are in order (this block is closer than that block). Inside a block, messy is fine.</p>
+        <p>The pile also has a cheap “dump these on the front” operation, used when you already know a batch of places is closer than everything currently on the pile. You do not search for a slot. You stick a new block at the front.</p>
+        <div class="figure">
+          <svg viewBox="0 0 720 210" role="img" aria-label="Blocks instead of a fully sorted list">
+            <text x="20" y="28" font-size="14">Front of the pile — blocks we dumped because they were all closer</text>
+            <rect x="20" y="44" width="90" height="50" rx="8" fill="#d5eadc" stroke="#2c6a4f" />
+            <rect x="120" y="44" width="90" height="50" rx="8" fill="#d5eadc" stroke="#2c6a4f" />
+            <rect x="220" y="44" width="90" height="50" rx="8" fill="#d5eadc" stroke="#2c6a4f" />
+            <text x="65" y="74" text-anchor="middle" font-size="12">≤ M</text>
+            <text x="165" y="74" text-anchor="middle" font-size="12">≤ M</text>
+            <text x="265" y="74" text-anchor="middle" font-size="12">≤ M</text>
+            <text x="20" y="128" font-size="14">The rest — blocks from ordinary inserts, ordered by a cutoff per block</text>
+            <rect x="20" y="144" width="110" height="50" rx="8" fill="#f3e3c0" stroke="#c4892a" />
+            <rect x="150" y="144" width="110" height="50" rx="8" fill="#f3e3c0" stroke="#c4892a" />
+            <rect x="280" y="144" width="110" height="50" rx="8" fill="#f3e3c0" stroke="#c4892a" />
+            <rect x="410" y="144" width="110" height="50" rx="8" fill="#fffdf8" stroke="#9a9086" />
+            <text x="75" y="174" text-anchor="middle" font-size="12">closer</text>
+            <text x="205" y="174" text-anchor="middle" font-size="12">…</text>
+            <text x="335" y="174" text-anchor="middle" font-size="12">farther</text>
+            <text x="465" y="174" text-anchor="middle" font-size="12">time limit</text>
+            <text x="560" y="70" font-size="13" fill="#5e5348">Grab reads a</text>
+            <text x="560" y="88" font-size="13" fill="#5e5348">prefix of both</text>
+            <text x="560" y="106" font-size="13" fill="#5e5348">rows and keeps</text>
+            <text x="560" y="124" font-size="13" fill="#5e5348">about M smallest.</text>
+          </svg>
+          <p class="caption">You sort blocks, not every individual place. That is the trick.</p>
+        </div>
+        <p>When a block grows past M items, split it in half around the middle value. For a first C version, sorting that one block is fine. The paper uses a fancier linear-time median. Same idea.</p>
+        <div class="chint">
+          <strong>In C this is the fiddly piece</strong>
+          Two linked lists of blocks. Each block is a small array of <code>{place, guess}</code>. Remember where each place currently sits so a better guess can replace the old pair. Get “insert” and “grab a group” working with tests that have nothing to do with maps. Then add “dump on the front.”
+        </div>
+      </section>
+
+      <section id="flow">
+        <h2><span class="num">12.</span> The whole loop, as a flowchart</h2>
+        <p>The paper names this job “bounded multi-source shortest path.” Forget the name. In English it is:</p>
+        <div class="def">
+          <strong>The job one function call does</strong>
+          You get some already-locked-in start places, and a time limit. Finish every place whose cheapest route goes through those starts and whose cheapest time is under the limit. If that is too much work, finish only the closest chunk and return a tighter limit. The very first call is: one start <code>s</code>, time limit “none.” That one call is the original problem.
+        </div>
+        <p>Click a box.</p>
+        <div class="figure">
+          <svg id="flowSvg" viewBox="0 0 720 430" role="img" aria-label="Algorithm flowchart">
+            <text x="360" y="28" text-anchor="middle" font-size="14">Click a box. A plain-language note appears under the figure.</text>
+            <g class="flow-node" data-flow="start">
+              <rect x="210" y="44" width="300" height="46" rx="10" fill="#d3e6ee" stroke="#2a5f73" />
+              <text x="360" y="72" text-anchor="middle">Do this job (starts, time limit)</text>
+            </g>
+            <g class="flow-node" data-flow="base">
+              <rect x="24" y="140" width="250" height="54" rx="10" fill="#d5eadc" stroke="#2c6a4f" />
+              <text x="149" y="162" text-anchor="middle">Tiny job?</text>
+              <text x="149" y="180" text-anchor="middle" font-size="12">Walk from one place, stop after a handful</text>
+            </g>
+            <g class="flow-node" data-flow="pivots">
+              <rect x="420" y="140" width="270" height="54" rx="10" fill="#f3e3c0" stroke="#c4892a" />
+              <text x="555" y="162" text-anchor="middle">Find hubs</text>
+              <text x="555" y="180" text-anchor="middle" font-size="12">a few shouts, then keep the busy roots</text>
+            </g>
+            <g class="flow-node" data-flow="loop">
+              <rect x="420" y="230" width="270" height="70" rx="10" fill="#fffdf8" stroke="#241c14" />
+              <text x="555" y="256" text-anchor="middle">Grab a close group from the pile</text>
+              <text x="555" y="276" text-anchor="middle" font-size="12">repeat this whole job on that group</text>
+            </g>
+            <g class="flow-node" data-flow="relax">
+              <rect x="420" y="330" width="270" height="54" rx="10" fill="#f0d3c4" stroke="#b4451e" />
+              <text x="555" y="352" text-anchor="middle">Offer roads from newly locked places</text>
+              <text x="555" y="370" text-anchor="middle" font-size="12">put improved neighbours on the pile</text>
+            </g>
+            <line x1="360" y1="90" x2="149" y2="140" stroke="#5e5348" />
+            <line x1="360" y1="90" x2="555" y2="140" stroke="#5e5348" />
+            <line x1="555" y1="194" x2="555" y2="230" stroke="#5e5348" />
+            <line x1="555" y1="300" x2="555" y2="330" stroke="#5e5348" />
+            <path d="M420,357 C290,357 290,265 420,265" fill="none" stroke="#5e5348" stroke-dasharray="4 4" />
+            <text x="268" y="318" font-size="12" fill="#5e5348">until the pile is empty</text>
+            <text x="268" y="334" font-size="12" fill="#5e5348">or we locked a lot</text>
+          </svg>
+          <p class="caption" id="flowCaption">The whole algorithm is this loop, plus a tiny walk for the smallest jobs. Click any box.</p>
+        </div>
+      </section>
+
+      <section id="walk">
+        <h2><span class="num">13.</span> Watch the shape on our six-place map</h2>
+        <p>On six places the real settings collapse to “just do Dijkstra.” So this walk-through uses toy settings on purpose. The distances will match what you already saw. Watch the <em>control flow</em>: shrink to a hub, grab a group, lock a cluster, offer roads, grab the next group.</p>
+        <div class="figure">
+          <div class="stepper-bar">
+            <button type="button" id="wPrev">Back</button>
+            <button type="button" class="primary" id="wNext">Next</button>
+            <button type="button" id="wReset">Reset</button>
+            <span class="status" id="wStatus">Step 0</span>
+          </div>
+          <svg id="wSvg" viewBox="0 0 640 300" role="img" aria-label="Worked walk-through"></svg>
+          <p class="caption" id="wCaption">A scripted story of one successful top-level call.</p>
+        </div>
+      </section>
+
+      <section id="recipe">
+        <h2><span class="num">14.</span> The recipe you can implement</h2>
+        <p>English first. Then the same steps with the names the paper uses, so you can match a PDF later.</p>
+<pre><span class="fn">FINISH</span>(how_deep, time_limit, starts):
+    if how_deep is 0:                       <span class="cmt">// smallest kind of job</span>
+        walk like Dijkstra from the one start
+        stop after k+1 places, and never go past time_limit
+        return the places we locked in
+
+    hubs, touched = FIND-HUBS(time_limit, starts)
+    put each hub on an empty pile, with its current guess
+    locked = empty
+
+    while the pile is not empty and locked is not already huge:
+        group, tighter_limit = grab about M closest from the pile
+        newly = FINISH(how_deep - 1, tighter_limit, group)
+        add newly to locked
+        for each road out of a newly locked place:
+            offer the road
+            if the neighbour improved:
+                if they still sit between tighter_limit and time_limit:
+                    insert them on the pile
+                if they are closer than tighter_limit:
+                    remember them to dump on the front of the pile
+        dump those closer ones on the front
+        also dump any group members that were not finished
+
+    add anyone in touched whose guess is still under the limit we reached
+    return locked
+</pre>
+        <p>Top-level call, once:</p>
+<pre>guess[s] = 0
+guess[everyone else] = HUGE
+FINISH(how_deep = a small integer, time_limit = none, starts = {s})
+</pre>
+        <div class="warn">
+          <strong>When you offer a road, use ≤ not &lt;</strong>
+          If the new guess is <em>equal</em> to the old guess, still treat the road as used. The recursive layers reuse roads. If you write <code>if (new &lt; old)</code> in C, you will drop places. Break leftover ties by place id so the parent pointers stay a tree.
+        </div>
+        <details>
+          <summary>Optional: the two knobs, and the paper’s time claim</summary>
+          <p>There are two knobs. <code>k</code> is how many shouts. <code>t</code> controls how big a group you grab and how many times you recurse. The paper sets them from the number of places so the shouting work and the pile work stay balanced. Copy the formulas when you code. You do not need to invent them:</p>
+          <pre>k = floor( (log2 of n) ^ (1/3) )     <span class="cmt">// still 2–3 on huge maps</span>
+t = floor( (log2 of n) ^ (2/3) )
+how_deep = ceil( (log2 of n) / t )    <span class="cmt">// a handful of recursion levels</span>
+group size M at a given depth uses t as well</pre>
+          <p>On a map with about as many roads as places, Dijkstra’s extra waiting-list work grows like sorting all the places. The new extra work grows more slowly. That is the headline result. It is a paper-faster, not a “your phone will feel it” faster. Next section.</p>
+        </details>
+      </section>
+
+      <section id="honest">
+        <h2><span class="num">15.</span> Will this make your GPS faster?</h2>
+        <p>No. Not on maps you can actually store. People have implemented this faithfully and timed it against ordinary Dijkstra with a binary heap. Dijkstra won, by several times, on road maps with tens of millions of places. The new method does more bookkeeping per place. The “slower growing extra work” only wins if the map is so huge that the growth rate beats that extra bookkeeping. Published estimates say that may be beyond any graph that fits in memory.</p>
+        <p>So why bother?</p>
+        <ul>
+          <li>You wanted to understand a real 2025 result well enough to write it.</li>
+          <li>It is a clean lesson: the job you think you are solving (rank every place) might be stricter than the job you were asked (fill an array).</li>
+          <li>On <em>dense</em> maps (almost every place connected to every other) Dijkstra was already fine. The win is about maps that look like roads: not many roads per place.</li>
+        </ul>
+      </section>
+
+      <section id="c-plan">
+        <h2><span class="num">16.</span> What to type, in order</h2>
+        <p>Put this algorithm in the <code>graphs/</code> folder of the workspace. Tick the boxes. They stick in this browser.</p>
+        <div class="checklist" id="plan">
+          <label><input type="checkbox" data-k="p1" /> <span><strong>Store a map.</strong> For each place, a list of (neighbour, travel time). Hard-code the six-place map. Print neighbours to check.</span></label>
+          <label><input type="checkbox" data-k="p2" /> <span><strong>Guesses.</strong> An array <code>guess[]</code>, start at 0 for s and HUGE elsewhere. A function <code>offer(u, v)</code> that uses <code>&lt;=</code> and, on a tie, prefers the smaller place id. An array <code>parent[]</code>.</span></label>
+          <label><input type="checkbox" data-k="p3" /> <span><strong>Dijkstra as a checker.</strong> Binary heap. On the six-place map you must get 0, 3, 2, 8, 10, 13 for s,a,b,c,d,e.</span></label>
+          <label><input type="checkbox" data-k="p4" /> <span><strong>Tiny walk.</strong> Same as Dijkstra, but stop after k+1 places and refuse guesses past the time limit. Test it alone.</span></label>
+          <label><input type="checkbox" data-k="p5" /> <span><strong>Find hubs.</strong> k shout-rounds, the “already a crowd” early return, then tree-size counting. Print who you kept.</span></label>
+          <label><input type="checkbox" data-k="p6" /> <span><strong>The pile.</strong> Insert and grab-a-group first, with fake integer keys, no map. Dump-on-the-front second.</span></label>
+          <label><input type="checkbox" data-k="p7" /> <span><strong>The recursive FINISH.</strong> Wire the loop. Use toy k (like 2) on tiny maps. Compare every guess against Dijkstra.</span></label>
+          <label><input type="checkbox" data-k="p8" /> <span><strong>Real knobs.</strong> Plug in the paper’s formulas from n. Random maps with a few roads per place. Assert the arrays match.</span></label>
+        </div>
+        <h3>Files that stay out of each other’s way</h3>
+        <table>
+          <thead><tr><th>File</th><th>What goes there</th></tr></thead>
+          <tbody>
+            <tr><td><code>types.h</code> (repo root)</td><td>place id, travel time</td></tr>
+            <tr><td><code>graphs/graph.h/.c</code></td><td>the map — no <code>main</code></td></tr>
+            <tr><td><code>graphs/heap.h/.c</code></td><td>waiting list for the tiny walk and for Dijkstra — no <code>main</code></td></tr>
+            <tr><td><code>graphs/pile.h/.c</code></td><td>the block pile — no <code>main</code></td></tr>
+            <tr><td><code>graphs/bmssp.h/.c</code></td><td>find-hubs, tiny walk, FINISH — no <code>main</code></td></tr>
+            <tr><td><code>graphs/main.c</code></td><td>the program: load a map, run both methods, compare, print</td></tr>
+          </tbody>
+        </table>
+        <div class="chint">
+          <strong>How run/debug works in this workspace</strong>
+          Right-click <code>graphs/main.c</code> (or press F5) to compile that file plus every helper <code>.c</code> in <code>graphs/</code> that does not define <code>main</code>. A second program in the same folder, like a Dijkstra-only file with its own <code>main</code>, stays separate.
+        </div>
+      </section>
+
+      <section id="traps">
+        <h2><span class="num">17.</span> Mistakes that actually break a C port</h2>
+        <ul>
+          <li>Offering a road only when the new guess is <em>strictly</em> smaller. Use ≤.</li>
+          <li>Sorting the whole boundary “just while I get it working.” Then you have Dijkstra plus overhead, and you will think the paper is wrong.</li>
+          <li>Testing hub-finding on 20 places with the real formula for k. On small n, k becomes 1 and the interesting branch barely fires. Force k = 2 while you learn.</li>
+          <li>One shared heap across recursive calls. Each tiny walk owns a heap. Each FINISH call owns a pile. The only globals are <code>guess[]</code> and <code>parent[]</code>.</li>
+          <li>Treating “we stopped early and returned a tighter limit” as a bug. That is how a parent splits work into groups.</li>
+        </ul>
+      </section>
+
+      <section id="quiz">
+        <h2><span class="num">18.</span> Check yourself</h2>
+        <p>One best answer each. Click before you peek at the note underneath.</p>
+
+        <div class="quiz" data-answer="1">
+          <p><strong>1.</strong> Dijkstra always locks in the leftover place with the smallest guess. Why can a different method still be correct?</p>
+          <div class="choices">
+            <button type="button" class="choice" data-i="0">Because modern computers sort in linear time, so ranking is free.</button>
+            <button type="button" class="choice" data-i="1">Because we were asked for the times, not for a nearest-to-farthest ranking. The ranking was extra work Dijkstra happened to do.</button>
+            <button type="button" class="choice" data-i="2">Because one-way streets are easier than two-way streets.</button>
+            <button type="button" class="choice" data-i="3">Because travel times are integers.</button>
+          </div>
+          <p class="explain">If the output is an array of numbers, the order you lock places in does not have to be the order of those numbers. You still must not lock a place in too early — the new method is careful about that — but it does not keep a full leaderboard.</p>
+        </div>
+
+        <div class="quiz" data-answer="2">
+          <p><strong>2.</strong> A place is “locked in” when…</p>
+          <div class="choices">
+            <button type="button" class="choice" data-i="0">it has been inserted on the pile at least once.</button>
+            <button type="button" class="choice" data-i="1">it has no outgoing roads.</button>
+            <button type="button" class="choice" data-i="2">its best guess is proven to be the real cheapest time, so we will not change it again.</button>
+            <button type="button" class="choice" data-i="3">it is on the original boundary.</button>
+          </div>
+          <p class="explain">Locked in = finished. Boundary places are not automatically finished.</p>
+        </div>
+
+        <div class="quiz" data-answer="0">
+          <p><strong>3.</strong> Why shout only a few times when looking for hubs?</p>
+          <div class="choices">
+            <button type="button" class="choice" data-i="0">Short detours get finished. What is left hangs off a few busy roots. Those roots are the hubs, and there cannot be too many of them.</button>
+            <button type="button" class="choice" data-i="1">Shouting sorts the boundary in linear time.</button>
+            <button type="button" class="choice" data-i="2">To detect negative travel times.</button>
+            <button type="button" class="choice" data-i="3">To turn one-way roads into two-way roads.</button>
+          </div>
+          <p class="explain">Negative times are not allowed in this algorithm at all. Shouting is a probe, not a full solve.</p>
+        </div>
+
+        <div class="quiz" data-answer="3">
+          <p><strong>4.</strong> Grabbing from the pile returns…</p>
+          <div class="choices">
+            <button type="button" class="choice" data-i="0">The single closest place, like Dijkstra’s heap.</button>
+            <button type="button" class="choice" data-i="1">A random sample of the boundary.</button>
+            <button type="button" class="choice" data-i="2">Every place under the original time limit.</button>
+            <button type="button" class="choice" data-i="3">A handful of the currently closest places, plus a cutoff that separates them from the rest of the pile.</button>
+          </div>
+          <p class="explain">That handful is the start set of the next smaller job. Asking for a handful is cheaper than keeping a total ranking.</p>
+        </div>
+
+        <div class="quiz" data-answer="1">
+          <p><strong>5.</strong> You implement this carefully and time it against heap-Dijkstra on a 100,000-place road map. Dijkstra is faster. Did you fail?</p>
+          <div class="choices">
+            <button type="button" class="choice" data-i="0">Yes. The paper promised a speedup at every size.</button>
+            <button type="button" class="choice" data-i="1">No. The result is about how the extra work grows on paper. Real code has a large constant, so Dijkstra still wins on maps you can store.</button>
+            <button type="button" class="choice" data-i="2">Yes, unless you used a Fibonacci heap in Dijkstra.</button>
+            <button type="button" class="choice" data-i="3">No, because the algorithm uses randomness and you got unlucky.</button>
+          </div>
+          <p class="explain">The 2025 algorithm does not use randomness. It is slower in practice on tested sizes. That is expected.</p>
+        </div>
+
+        <div class="quiz" data-answer="2">
+          <p><strong>6.</strong> The call that solves the original job (one start, every place) is…</p>
+          <div class="choices">
+            <button type="button" class="choice" data-i="0">Find hubs from every place at once.</button>
+            <button type="button" class="choice" data-i="1">The tiny Dijkstra walk from every place.</button>
+            <button type="button" class="choice" data-i="2">FINISH with starts = {s}, no time limit, after setting guess[s] = 0.</button>
+            <button type="button" class="choice" data-i="3">k shout-rounds from s and then stop.</button>
+          </div>
+          <p class="explain">Everything else is a helper. That one top call is the whole problem.</p>
+        </div>
+      </section>
+
+      <section id="dictionary">
+        <h2><span class="num">19.</span> If you open the paper later</h2>
+        <p>The PDF uses different words. Same objects.</p>
+        <table>
+          <thead><tr><th>This page</th><th>The paper</th></tr></thead>
+          <tbody>
+            <tr><td>place</td><td>vertex</td></tr>
+            <tr><td>road, travel time</td><td>edge, weight</td></tr>
+            <tr><td>best guess so far</td><td>d̂ (d-hat)</td></tr>
+            <tr><td>locked in</td><td>complete</td></tr>
+            <tr><td>not sure yet</td><td>incomplete</td></tr>
+            <tr><td>boundary</td><td>frontier S</td></tr>
+            <tr><td>hub</td><td>pivot</td></tr>
+            <tr><td>offer a road</td><td>relax</td></tr>
+            <tr><td>time limit</td><td>B</td></tr>
+            <tr><td>the pile</td><td>data structure D</td></tr>
+            <tr><td>grab a group</td><td>Pull</td></tr>
+            <tr><td>dump on the front</td><td>BatchPrepend</td></tr>
+            <tr><td>FINISH</td><td>BMSSP</td></tr>
+            <tr><td>tiny walk</td><td>BaseCase</td></tr>
+            <tr><td>how many shouts</td><td>k</td></tr>
+            <tr><td>stopped early with a tighter limit</td><td>partial execution</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="sources">
+        <h2><span class="num">20.</span> Where this came from</h2>
+        <ul>
+          <li>Ran Duan, Jiayi Mao, Xiao Mao, Xinkai Shu, Longhui Yin. The 2025 paper that introduced the method. Search for “Breaking the Sorting Barrier for Directed Single-Source Shortest Paths.”</li>
+          <li>Ben Brubaker, Quanta Magazine, August 2025. A news write-up of the same result. Still not a tutorial, but less dense than the PDF.</li>
+          <li>Edsger Dijkstra, 1959. The always-pick-the-nearest method.</li>
+          <li>Lucas Castro, Thailsson Clementino, Rosiane de Freitas, 2025. They implemented the new method and timed it. Dijkstra still won on the maps they tried.</li>
+        </ul>
+        <p class="muted">This page is a teaching rewrite. The proofs live in the paper. If a sentence here disagrees with the paper, the paper wins.</p>
+      </section>
+
+      <div class="footer-nav">
+        <span class="muted">File: <code>docs/index.html</code></span>
+        <a href="#how">Back to top</a>
+      </div>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

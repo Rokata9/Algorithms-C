@@ -1,0 +1,47 @@
+{
+  "files.encoding": "utf8",
+  "files.eol": "\n",
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+  "files.associations": {
+    "*.h": "c",
+    "*.c": "c"
+  },
+  "files.exclude": {
+    "build": false,
+    "**/.DS_Store": true
+  },
+  "search.exclude": {
+    "**/build": true,
+    "**/*.dSYM": true
+  },
+  "C_Cpp.default.cStandard": "c17",
+  "C_Cpp.default.compilerPath": "/usr/bin/clang",
+  "C_Cpp.default.includePath": [
+    "${workspaceFolder}",
+    "${workspaceFolder}/**"
+  ],
+  "C_Cpp.default.intelliSenseMode": "macos-clang-arm64",
+  "C_Cpp.errorSquiggles": "enabled",
+  "C_Cpp.intelliSenseEngine": "default",
+  "C_Cpp.debugShortcut": false,
+  "code-runner.showRunIconInEditorTitleMenu": true,
+  "code-runner.showRunCommandInEditorContextMenu": true,
+  "code-runner.showRunCommandInExplorerContextMenu": true,
+  "makefile.configureOnOpen": false,
+  "code-runner.runInTerminal": true,
+  "code-runner.saveFileBeforeRun": true,
+  "code-runner.clearPreviousOutput": true,
+  "code-runner.preserveFocus": false,
+  "code-runner.ignoreSelection": true,
+  "code-runner.fileDirectoryAsCwd": false,
+  "code-runner.executorMap": {
+    "c": "\"$workspaceRoot/scripts/run.sh\" \"$fullFileName\""
+  },
+  "code-runner.languageIdToFileExtensionMap": {
+    "c": ".c"
+  },
+  "terminal.integrated.cwd": "${workspaceFolder}",
+  "debug.onTaskErrors": "abort",
+  "debug.openDebug": "openOnDebugBreak"
+}

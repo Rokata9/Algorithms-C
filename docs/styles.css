@@ -375,6 +375,60 @@ li { margin: 0 0 6px; }
 @media (max-width: 980px) {
   .dij-layout { grid-template-columns: 1fr; }
 }
+
+.handful {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+.handful button.place {
+  min-width: 72px;
+  border-radius: 10px;
+  padding: 10px 8px;
+  font-family: var(--mono);
+}
+.handful button.place .t {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+.handful button.place.taken {
+  background: var(--forest);
+  color: #fff;
+  border-color: var(--forest);
+}
+.handful button.place.taken .t { color: #e8f6ee; }
+.handful button.place.batch {
+  background: var(--gold);
+  border-color: var(--gold);
+}
+.meta-row {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  margin: 0 0 6px;
+}
+
+.pick-card { background: var(--forest-soft); border-color: color-mix(in srgb, var(--forest) 40%, var(--rule)); }
+.offer-card { background: var(--gold-soft); border-color: color-mix(in srgb, var(--gold) 45%, var(--rule)); }
+.pick-card h3, .offer-card h3 { margin-top: 0; }
+.film {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: 8px 0 14px;
+  font-size: 0.82rem;
+}
+.film span {
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+}
+.film .pick { background: var(--forest); color: #fff; }
+.film .offer { background: var(--gold); color: #241c14; }
+.film .label { background: none; padding-left: 0; color: var(--ink-soft); font-family: var(--sans); }
 .legend {
   display: flex;
   flex-wrap: wrap;

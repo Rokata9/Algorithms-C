@@ -31,8 +31,8 @@
       </ol>
       <p class="toc-group">The new way</p>
       <ol>
-        <li><a href="#idea">The new recipe</a></li>
-        <li><a href="#hubs">Find the busy intersections</a></li>
+        <li><a href="#idea">What the new method changes</a></li>
+        <li><a href="#hubs">Which starts we keep</a></li>
         <li><a href="#groups">Handle a group, not one place</a></li>
         <li><a href="#pile">A pile, not a ranked list</a></li>
         <li><a href="#flow">The whole loop</a></li>
@@ -319,60 +319,135 @@ repeat a small number of times:
       </section>
 
       <section id="idea">
-        <h2><span class="num">8.</span> The new recipe, in four kitchen steps</h2>
-        <p>Still working outward from the start, like Dijkstra. But we refuse to keep the whole waiting list fully ranked.</p>
-        <ol>
-          <li><strong>Look at the current boundary</strong> — places we can reach that are not all locked in yet.</li>
-          <li><strong>Shout a few times</strong> from that boundary. Short detours get locked in for free. What is left tends to hang off a few busy intersections.</li>
-          <li><strong>Keep only those busy intersections</strong> as the people we will expand from. Throw the quiet boundary places back in a later pile.</li>
-          <li><strong>Take a small group of the closest busy ones</strong> — not the single closest, a handful — and repeat the whole recipe on that smaller job. Then the next handful. Then the side streets.</li>
-        </ol>
-        <div class="figure">
-          <svg viewBox="0 0 720 210" role="img" aria-label="High level idea">
-            <defs>
-              <marker id="arrow2" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
-                <path d="M0,0 L8,4 L0,8 z" fill="#5e5348"></path>
-              </marker>
-            </defs>
-            <rect x="16" y="40" width="150" height="90" rx="12" fill="#d5eadc" stroke="#2c6a4f" />
-            <text x="91" y="78" text-anchor="middle" font-size="14">already sure</text>
-            <text x="91" y="100" text-anchor="middle" font-size="12" fill="#5e5348">locked in</text>
-            <rect x="200" y="28" width="200" height="114" rx="12" fill="#f3e3c0" stroke="#c4892a" />
-            <text x="300" y="58" text-anchor="middle" font-size="14">the boundary</text>
-            <circle cx="250" cy="100" r="14" fill="#2c6a4f" />
-            <circle cx="290" cy="100" r="14" fill="#c9a227" />
-            <circle cx="330" cy="100" r="14" fill="#c9a227" />
-            <circle cx="370" cy="100" r="14" fill="#c9a227" />
-            <text x="250" y="104" text-anchor="middle" fill="#fff" font-size="10">hub</text>
-            <rect x="440" y="40" width="250" height="90" rx="12" fill="#fffdf8" stroke="#9a9086" />
-            <text x="565" y="78" text-anchor="middle" font-size="14">still unknown</text>
-            <text x="565" y="100" text-anchor="middle" font-size="12" fill="#5e5348">must go through the boundary</text>
-            <path d="M166,85 L200,85" stroke="#241c14" marker-end="url(#arrow2)" />
-            <text x="360" y="172" text-anchor="middle" font-size="13">Keep the hubs. Handle them in small groups. Come back for the rest.</text>
-          </svg>
-          <p class="caption">Dijkstra would rank every gold place. The new method ranks almost none of them. It only cares about the green hub.</p>
+        <h2><span class="num">8.</span> PICK vs OFFER — then skip PICK for a while</h2>
+        <p><a href="visual-08-09.html"><strong>Open the wide visual</strong></a> — machines, three layer snapshots, flowchart, and a full-width map. Built for an ultrawide screen.</p>
+        <p>Your Dijkstra loop is two kinds of step. They are not the same.</p>
+        <div class="grid-2">
+          <div class="card pick-card">
+            <h3>PICK — the only lock</h3>
+            <p>Scan leftovers. Take the smallest guess. Mark it locked. Nobody else locks here.</p>
+<pre>for (int i = 0; i &lt; PLACE_COUNT; i++) {
+    if (waiting[i] &lt; value) {
+        u = i;
+        value = waiting[i];
+    }
+}
+waiting_n--;
+waiting[u] = HUGE;              <span class="cmt">// lock u</span>
+</pre>
+          </div>
+          <div class="card offer-card">
+            <h3>OFFER — update guesses only</h3>
+            <p>Each road out of that locked <code>u</code>. Maybe a neighbour gets a cheaper guess. <strong>Nobody locks.</strong></p>
+<pre>for (int i = 0; i &lt; out_n[u]; i++) {
+    int v = out[u][i].to;
+    int w = out[u][i].time;
+    if (guess[u] + w &lt; guess[v]) {
+        guess[v] = guess[u] + w;
+        waiting[v] = guess[v];
+    }
+}
+</pre>
+          </div>
         </div>
-        <div class="insight">
-          <strong>Two savings, stacked</strong>
-          First: most boundary places are not hubs, so you stop babysitting them. Second: when you do pick from the remaining pile, you grab a handful of “pretty close” places instead of hunting for the single closest every time. Hunting for one minimum in a huge list is the sorting-shaped cost. Asking for a handful is cheaper.
+        <p>Your loop alternates. Green = PICK. Gold = OFFER.</p>
+        <div class="film" aria-label="Dijkstra step kinds">
+          <span class="label">You wrote:</span>
+          <span class="pick">PICK s</span>
+          <span class="offer">OFFER s</span>
+          <span class="pick">PICK b</span>
+          <span class="offer">OFFER b</span>
+          <span class="pick">PICK a</span>
+          <span class="offer">OFFER a</span>
+          <span class="offer">…</span>
+        </div>
+        <p><strong>Change 1:</strong> after <code>s</code> is locked, do two OFFER rounds and skip every PICK. Same map as section 5. The panel says what Dijkstra would have PICKed — we do not.</p>
+        <div class="figure">
+          <div class="stepper-bar">
+            <button type="button" id="ch8Prev">Back</button>
+            <button type="button" class="primary" id="ch8Next">Next</button>
+            <button type="button" id="ch8Reset">Reset</button>
+            <span class="status" id="ch8Status">Step 0</span>
+          </div>
+          <div class="dij-layout">
+            <svg id="ch8Svg" viewBox="0 0 640 300" role="img" aria-label="Offer-only stepper"></svg>
+            <div class="dij-side">
+              <h4>This step</h4>
+              <div class="dij-action" id="ch8Action">—</div>
+              <h4>Dijkstra would PICK now</h4>
+              <p class="meta-row" id="ch8WouldPick"></p>
+              <h4>OFFER from this layer</h4>
+              <p class="meta-row" id="ch8Layer"></p>
+              <h4>Guesses</h4>
+              <ol class="pq" id="ch8Guess"></ol>
+            </div>
+          </div>
+          <div class="legend">
+            <span><i class="swatch" style="background:#2c6a4f"></i>locked (only s, on purpose)</span>
+            <span><i class="swatch" style="background:#c9a227"></i>has a guess, not locked</span>
+            <span><i class="swatch" style="background:#b4451e"></i>road we just offered</span>
+          </div>
+          <p class="caption" id="ch8Caption">Press Next.</p>
+          <div class="note" id="ch8Why"></div>
+        </div>
+        <div class="film" aria-label="New method step kinds">
+          <span class="label">This demo:</span>
+          <span class="offer">OFFER from s</span>
+          <span class="offer">OFFER from a,b</span>
+          <span class="label">no PICK in between</span>
+        </div>
+        <p><strong>Change 2:</strong> when you later PICK, take several closest leftovers, not one. Same waiting list idea as your array scan — you just keep the three smallest instead of the one smallest.</p>
+        <div class="figure">
+          <div class="stepper-bar">
+            <button type="button" class="primary" id="hfDij">PICK 1 (Dijkstra)</button>
+            <button type="button" id="hfNew">PICK 3 (new)</button>
+            <button type="button" id="hfReset">Reset</button>
+          </div>
+          <div class="handful" id="handfulList"></div>
+          <p class="caption" id="hfNote">Tiles = leftovers and their guesses.</p>
         </div>
       </section>
 
       <section id="hubs">
-        <h2><span class="num">9.</span> How to find a hub</h2>
-        <p>Take the current boundary. Shout a tiny number of times — on a real huge map this number is still 2 or 3. Call that number “how many shouts,” or later, <code>k</code>.</p>
-        <p>Then look at who you touched.</p>
-        <div class="grid-2">
-          <div class="card">
-            <h3>Case A — you already reached a crowd</h3>
-            <p>If the boundary is already small compared with how many places you just touched, you are done shrinking. The whole boundary can act as hubs. There is nothing extra to do.</p>
-          </div>
-          <div class="card">
-            <h3>Case B — you only reached a few</h3>
-            <p>Then cheap short detours are already locked in. Whatever is still unfinished hangs off a few places whose “family tree” of current best routes is large. Those roots are the hubs. There cannot be many of them: each one “owns” at least <code>k</code> places, and places are not shared.</p>
-          </div>
+        <h2><span class="num">9.</span> After those offer-rounds: which starts we keep</h2>
+        <p><a href="visual-08-09.html"><strong>Same wide visual</strong></a> — the big map, ownership trees, and keep/drop pictures live there.</p>
+        <p>The last section skipped PICK and only OFFERed. Next: after those OFFERs, which locked starts do we still use as sources? The six-place map is the wrong demo for that (from <code>s</code> alone you already reach a crowd). This map makes the choice visible.</p>
+        <p>Three starts, already locked, guess 0: <code>x</code>, <code>y</code>, <code>z</code>. Each begins a chain. Every road has time 1, so a guess is just “how many roads from a start.”</p>
+        <div class="figure" aria-label="Three chains from x y z">
+          <svg viewBox="0 0 640 200" role="img">
+            <defs>
+              <marker id="arrowH" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+                <path d="M0,0 L8,4 L0,8 z" fill="#5e5348"></path>
+              </marker>
+            </defs>
+            <line x1="70" y1="40" x2="180" y2="40" stroke="#5e5348" stroke-width="2" marker-end="url(#arrowH)" />
+            <line x1="220" y1="40" x2="330" y2="40" stroke="#5e5348" stroke-width="2" marker-end="url(#arrowH)" />
+            <line x1="370" y1="40" x2="480" y2="40" stroke="#5e5348" stroke-width="2" marker-end="url(#arrowH)" />
+            <line x1="70" y1="100" x2="180" y2="100" stroke="#5e5348" stroke-width="2" marker-end="url(#arrowH)" />
+            <line x1="220" y1="100" x2="330" y2="100" stroke="#5e5348" stroke-width="2" marker-end="url(#arrowH)" />
+            <line x1="70" y1="160" x2="180" y2="160" stroke="#5e5348" stroke-width="2" marker-end="url(#arrowH)" />
+            <text x="125" y="32" fill="#b4451e" font-size="13">1</text>
+            <text x="275" y="32" fill="#b4451e" font-size="13">1</text>
+            <text x="425" y="32" fill="#b4451e" font-size="13">1</text>
+            <text x="125" y="92" fill="#b4451e" font-size="13">1</text>
+            <text x="275" y="92" fill="#b4451e" font-size="13">1</text>
+            <text x="125" y="152" fill="#b4451e" font-size="13">1</text>
+            <circle cx="50" cy="40" r="18" fill="#2c6a4f" /><text x="50" y="45" text-anchor="middle" fill="#fff" font-size="14">x</text>
+            <circle cx="200" cy="40" r="18" fill="#fffdf8" stroke="#241c14" stroke-width="2" /><text x="200" y="45" text-anchor="middle" font-size="14">p</text>
+            <circle cx="350" cy="40" r="18" fill="#fffdf8" stroke="#241c14" stroke-width="2" /><text x="350" y="45" text-anchor="middle" font-size="14">q</text>
+            <circle cx="500" cy="40" r="18" fill="#fffdf8" stroke="#241c14" stroke-width="2" /><text x="500" y="45" text-anchor="middle" font-size="14">r</text>
+            <circle cx="50" cy="100" r="18" fill="#2c6a4f" /><text x="50" y="105" text-anchor="middle" fill="#fff" font-size="14">y</text>
+            <circle cx="200" cy="100" r="18" fill="#fffdf8" stroke="#241c14" stroke-width="2" /><text x="200" y="105" text-anchor="middle" font-size="14">u</text>
+            <circle cx="350" cy="100" r="18" fill="#fffdf8" stroke="#241c14" stroke-width="2" /><text x="350" y="105" text-anchor="middle" font-size="14">v</text>
+            <circle cx="50" cy="160" r="18" fill="#2c6a4f" /><text x="50" y="165" text-anchor="middle" fill="#fff" font-size="14">z</text>
+            <circle cx="200" cy="160" r="18" fill="#fffdf8" stroke="#241c14" stroke-width="2" /><text x="200" y="165" text-anchor="middle" font-size="14">w</text>
+          </svg>
+          <p class="caption">Green = current starts (already locked). Top chain is long, middle is medium, bottom is short. We will do k = 3 offer-rounds from x, y, and z together — no PICK.</p>
         </div>
-        <p>Press Next. We use a toy “2 shouts” so you can see a round happen. On six places the crowd case (A) fires immediately. That is honest, not a bug. The last step tells you what case B would have done.</p>
+        <p>Each time a guess improves, record <code>parent[neighbour] = the place we offered from</code>, same as you can do in Dijkstra. After the offer-rounds, follow <code>parent</code> until you hit a start. That start <strong>owns</strong> this place. Count how many places each start owns (including itself).</p>
+        <p>A start is a <strong>hub</strong> if it owns at least <code>k</code> places. We keep hubs as sources for the rest of the algorithm. We drop the other starts: their short chains already got the right guess in those <code>k</code> rounds, so we do not need them as sources any more.</p>
+        <p>There is an early exit: if the number of places we touched is already bigger than <code>k × (number of starts)</code>, the start list is already small compared with the work. Then we keep every start and skip the counting. On the six-place map that exit fires. On this map it does not, so you will see the counting.</p>
+        <p>Press <strong>Next</strong>. Same offers as Dijkstra, except there is no PICK in this procedure: only OFFER, then a few count steps at the end. Watch the panel on the right.</p>
         <div class="figure">
           <div class="stepper-bar">
             <button type="button" id="pvPrev">Back</button>
@@ -380,8 +455,41 @@ repeat a small number of times:
             <button type="button" id="pvReset">Reset</button>
             <span class="status" id="pvStatus">Step 0</span>
           </div>
-          <svg id="pvSvg" viewBox="0 0 640 320" role="img" aria-label="Hub finding stepper"></svg>
-          <p class="caption" id="pvCaption">Toy setting: 2 shouts from s. Watch guesses update, then the decision: already a crowd, or inspect family trees?</p>
+          <div class="dij-layout">
+            <svg id="pvSvg" viewBox="0 0 640 340" role="img" aria-label="Find hubs stepper"></svg>
+            <div class="dij-side">
+              <h4>What this step is</h4>
+              <div class="dij-action" id="pvAction">—</div>
+              <p class="meta-row" id="pvMeta"></p>
+              <h4>This offer-round’s layer</h4>
+              <p class="meta-row" id="pvLayer"></p>
+              <h4>parent[] (who we came from)</h4>
+              <p class="meta-row" id="pvParents"></p>
+              <h4>Places owned by each start</h4>
+              <ol class="pq" id="pvSizes"></ol>
+              <h4>Hubs we keep</h4>
+              <p class="meta-row" id="pvHubs"></p>
+            </div>
+          </div>
+          <div class="legend">
+            <span><i class="swatch" style="background:#2c6a4f"></i>start (already locked)</span>
+            <span><i class="swatch" style="background:#c9a227"></i>touched this run</span>
+            <span><i class="swatch" style="background:#2a5f73"></i>hub (kept)</span>
+            <span><i class="swatch" style="background:#9a9086"></i>start we drop</span>
+            <span>green arrows = parent[]</span>
+          </div>
+          <p class="caption" id="pvCaption">Press Next.</p>
+          <div class="note" id="pvWhy"></div>
+        </div>
+        <div class="grid-2">
+          <div class="card">
+            <h3>Early exit — “already a crowd”</h3>
+            <p>Touched more than <code>k × |starts|</code> places. Keep every start. No counting. This is what the six-place map does from <code>s</code> alone.</p>
+          </div>
+          <div class="card">
+            <h3>What you will see here</h3>
+            <p>Touched 9 places, threshold 9, so we count. <code>x</code> owns 4, <code>y</code> owns 3, <code>z</code> owns 2. <code>k = 3</code>, so we keep <code>x</code> and <code>y</code>. We drop <code>z</code>: <code>w</code> was only one road away, already finished.</p>
+          </div>
         </div>
         <div class="tabs" role="tablist">
           <button type="button" class="tab" data-pane="pv-en" aria-selected="true">English</button>
@@ -389,31 +497,32 @@ repeat a small number of times:
         </div>
         <div id="pv-en" class="pane">
           <div class="note">
-            <strong>Find hubs</strong>
-            Start from the boundary. For a few rounds, offer outgoing roads, but ignore anything past a time limit you were given. Collect everyone you touched. If that collection is already a crowd compared with the boundary, return the whole boundary as hubs. If not, follow each place’s “I got my guess from this parent” pointer, build those family trees, and keep only roots whose tree is big.
+            <strong>Find which starts to keep</strong>
+            Starts = the current source places. Touched begins as those starts. Repeat <code>k</code> times: offer every road out of the places you reached in the previous round (the layer). Collect everyone whose new guess is still under the time limit. If touched is already bigger than <code>k</code> times the number of starts, keep all starts and stop. Otherwise follow <code>parent[]</code> to see which start owns each touched place. Keep a start if it owns at least <code>k</code> places.
           </div>
         </div>
         <div id="pv-ps" class="pane" hidden>
-<pre><span class="fn">FIND-HUBS</span>(time_limit, boundary):
-    touched = copy of boundary
-    layer = boundary
-    repeat k times:                         <span class="cmt">// k is "how many shouts"</span>
+<pre><span class="fn">FIND-HUBS</span>(time_limit, starts):
+    touched = copy of starts
+    layer = starts
+    repeat k times:
         next_layer = empty
         for each road out of a place in layer:
             offer that road
             if the neighbour's new guess is still under time_limit:
                 add neighbour to next_layer and to touched
-        if touched is already a crowd compared with boundary:
-            return boundary as the hubs
+                parent[neighbour] = the place we offered from
+        if size of touched &gt; k * size of starts:
+            return all starts as hubs     <span class="cmt">// early exit</span>
         layer = next_layer
-    look at parent-pointers inside touched
-    hubs = boundary places whose family tree has at least k places
+    for each start, count how many touched places follow parent[] back to it
+    hubs = starts whose count is at least k
     return hubs
 </pre>
         </div>
         <div class="chint">
           <strong>In C</strong>
-          <code>touched</code> is an array of ids plus a boolean “already listed” so you do not push duplicates. The family tree is just an array <code>parent[place]</code> you already update when a guess improves. Count tree sizes with a walk from the leaves, or a DFS. Each place has only a few outgoing roads if you store the map normally.
+          <code>touched</code> is an array of ids plus a boolean “already listed.” <code>parent[]</code> is the same array you can keep in Dijkstra when a guess improves. Count “owned” by walking from every touched place up <code>parent</code> until you hit a start, and add 1 to that start’s counter. Or walk the tree downward. Same numbers.
         </div>
       </section>
 

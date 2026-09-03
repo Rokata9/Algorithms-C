@@ -40,20 +40,44 @@
     return document.getElementById(id);
   }
 
-  function nodeMap() {
+  const HUB = {
+    nodes: [
+      { id: "x", x: 50, y: 50 },
+      { id: "p", x: 200, y: 50 },
+      { id: "q", x: 350, y: 50 },
+      { id: "r", x: 500, y: 50 },
+      { id: "y", x: 50, y: 160 },
+      { id: "u", x: 200, y: 160 },
+      { id: "v", x: 350, y: 160 },
+      { id: "z", x: 50, y: 270 },
+      { id: "w", x: 200, y: 270 },
+    ],
+    edges: [
+      { u: "x", v: "p", w: 1 },
+      { u: "p", v: "q", w: 1 },
+      { u: "q", v: "r", w: 1 },
+      { u: "y", v: "u", w: 1 },
+      { u: "u", v: "v", w: 1 },
+      { u: "z", v: "w", w: 1 },
+    ],
+  };
+
+  function nodeMap(graph) {
+    const g = graph || G;
     const m = {};
-    G.nodes.forEach((n) => {
+    g.nodes.forEach((n) => {
       m[n.id] = n;
     });
     return m;
   }
 
-  function adjList() {
+  function adjList(graph) {
+    const g = graph || G;
     const a = {};
-    G.nodes.forEach((n) => {
+    g.nodes.forEach((n) => {
       a[n.id] = [];
     });
-    G.edges.forEach((e) => a[e.u].push(e));
+    g.edges.forEach((e) => a[e.u].push(e));
     return a;
   }
 
@@ -97,15 +121,18 @@
   function drawGraph(svg, state) {
     svg.innerHTML = "";
     ensureMarker(svg);
-    const pos = nodeMap();
+    const graph = state.graph || G;
+    const pos = nodeMap(graph);
     const dist = state.dist || {};
     const complete = new Set(state.complete || []);
     const frontier = new Set(state.frontier || []);
+    const hubs = new Set(state.hubs || []);
+    const dropped = new Set(state.dropped || []);
     const current = state.current;
     const hot = state.hotEdge;
     const pred = state.pred || {};
 
-    G.edges.forEach((e) => {
+    graph.edges.forEach((e) => {
       const p = edgePoints(pos[e.u], pos[e.v]);
       const isHot = hot && hot.u === e.u && hot.v === e.v;
       const isPred = pred[e.v] === e.u;
@@ -131,12 +158,20 @@
       svg.appendChild(label);
     });
 
-    G.nodes.forEach((n) => {
+    graph.nodes.forEach((n) => {
       let fill = paper();
       let stroke = ink();
       let sw = 2;
       let tfill = ink();
-      if (complete.has(n.id)) {
+      if (hubs.has(n.id)) {
+        fill = "#2a5f73";
+        stroke = "#2a5f73";
+        tfill = "#fff";
+      } else if (dropped.has(n.id)) {
+        fill = "#9a9086";
+        stroke = "#9a9086";
+        tfill = "#fff";
+      } else if (complete.has(n.id)) {
         fill = "#2c6a4f";
         stroke = "#2c6a4f";
         tfill = "#fff";
@@ -409,6 +444,154 @@
 
   bindStepper(dijkstraSteps(), "dijSvg", "dijStatus", "dijCaption", "dijPrev", "dijNext", "dijReset", fillDijPanel);
 
+  /* ---------- Chapter 8: OFFER-only, no PICK ---------- */
+  function ch8Steps() {
+    const dist = {};
+    const pred = {};
+    G.nodes.forEach((n) => {
+      dist[n.id] = INF;
+    });
+    dist.s = 0;
+    const locked = ["s"];
+    const adj = adjList();
+    const steps = [];
+    let layer = ["s"];
+
+    function wouldPick() {
+      let best = null;
+      let bestD = INF;
+      G.nodes.forEach((n) => {
+        if (locked.indexOf(n.id) >= 0) return;
+        if (dist[n.id] < bestD) {
+          bestD = dist[n.id];
+          best = n.id;
+        }
+      });
+      return best ? { id: best, guess: bestD } : null;
+    }
+
+    function snap(caption, extra) {
+      const wp = wouldPick();
+      const reached = G.nodes.filter((n) => dist[n.id] < INF / 2).map((n) => n.id);
+      steps.push({
+        graph: G,
+        dist: { ...dist },
+        pred: { ...pred },
+        complete: [...locked],
+        frontier: reached.filter((id) => locked.indexOf(id) < 0),
+        caption,
+        wouldPick: wp,
+        guesses: G.nodes.map((n) => ({ id: n.id, guess: dist[n.id] })),
+        ...extra,
+      });
+    }
+
+    snap("s is already locked. In your code the next line is PICK (closest leftover). This demo skips every PICK and only OFFERs.", {
+      kind: "init",
+      action: "s locked — next, OFFER only",
+      why: "PICK would scan waiting[] and lock the closest leftover. We will not do that. We will run your OFFER loop from s, then from whoever got a guess, then stop.",
+      layer: ["s"],
+    });
+
+    for (let round = 1; round <= 2; round++) {
+      const roads = [];
+      layer.forEach((u) => {
+        (adj[u] || []).forEach((e) => roads.push(e));
+      });
+      roads.forEach((e, idx) => {
+        const old = dist[e.v];
+        const cand = dist[e.u] + e.w;
+        if (cand < dist[e.v]) {
+          dist[e.v] = cand;
+          pred[e.v] = e.u;
+        }
+        const wp = wouldPick();
+        snap(
+          "OFFER " +
+            e.u +
+            " → " +
+            e.v +
+            ": guess[" +
+            e.v +
+            "] " +
+            (old >= INF / 2 ? "?" : old) +
+            " → " +
+            dist[e.v] +
+            ".",
+          {
+            kind: "offer",
+            current: e.u,
+            hotEdge: e,
+            action: "OFFER (round " + round + ", road " + (idx + 1) + "/" + roads.length + ") — not PICK",
+            why:
+              "This is your inner for-loop. " +
+              e.v +
+              " is gold, not green: a cheaper guess is not a lock. " +
+              (wp
+                ? "If this were Dijkstra, the next PICK would lock " + wp.id + " (guess " + wp.guess + "). We skip that PICK."
+                : "No leftover has a guess yet."),
+            layer: [...layer],
+          }
+        );
+      });
+      const nextLayer = [];
+      const seen = {};
+      roads.forEach((e) => {
+        if (dist[e.v] < INF / 2 && locked.indexOf(e.v) < 0 && !seen[e.v]) {
+          seen[e.v] = 1;
+          nextLayer.push(e.v);
+        }
+      });
+      snap("End of OFFER round " + round + ". Still nobody new is locked. Layer for the next round: " + (nextLayer.join(", ") || "none") + ".", {
+        kind: "round",
+        action: "End of OFFER round " + round + " — still no PICK",
+        why:
+          round === 1
+            ? "Your Dijkstra would have PICKed b by now (smallest leftover guess). We did not. Round 2 OFFERs from everyone who just got a guess."
+            : "Two OFFER rounds, zero extra PICKs. a, b, c, d have guesses. Only s is locked. That is change 1.",
+        layer: [...nextLayer],
+      });
+      layer = nextLayer;
+    }
+    return steps;
+  }
+
+  function fillCh8Panel(st) {
+    const action = $("ch8Action");
+    const would = $("ch8WouldPick");
+    const layerEl = $("ch8Layer");
+    const guessEl = $("ch8Guess");
+    const why = $("ch8Why");
+    if (!action) return;
+    action.textContent = st.action || "";
+    action.className = "dij-action " + (st.kind === "offer" ? "offer" : "pick");
+    if (why) why.textContent = st.why || "";
+    if (would) {
+      would.textContent = st.wouldPick
+        ? st.wouldPick.id + "  (guess " + st.wouldPick.guess + ") — we do not lock them"
+        : "nobody (no leftover has a guess yet)";
+    }
+    if (layerEl) layerEl.textContent = (st.layer && st.layer.length ? st.layer.join(", ") : "—");
+    if (guessEl) {
+      guessEl.innerHTML = "";
+      (st.guesses || []).forEach((g) => {
+        const li = document.createElement("li");
+        const val = g.guess >= INF / 2 ? "?" : g.guess;
+        const locked = (st.complete || []).indexOf(g.id) >= 0;
+        if (locked) li.classList.add("next");
+        if (st.wouldPick && st.wouldPick.id === g.id) li.classList.add("moved");
+        li.innerHTML = "<span>" + g.id + "</span><span>" + val + "</span>";
+        const tag = document.createElement("span");
+        tag.className = "tag";
+        tag.textContent = locked ? "locked" : st.wouldPick && st.wouldPick.id === g.id ? "Dijkstra would PICK" : "";
+        if (tag.textContent) li.appendChild(tag);
+        guessEl.appendChild(li);
+      });
+    }
+  }
+
+  bindStepper(ch8Steps(), "ch8Svg", "ch8Status", "ch8Caption", "ch8Prev", "ch8Next", "ch8Reset", fillCh8Panel);
+
   /* ---------- Bellman-Ford stepper ---------- */
   function bfSteps() {
     const dist = {};
@@ -452,101 +635,299 @@
   }
   bindStepper(bfSteps(), "bfSvg", "bfStatus", "bfCaption", "bfPrev", "bfNext", "bfReset");
 
-  /* ---------- FindPivots stepper ---------- */
-  function pivotSteps() {
-    const k = 2;
-    const B = 20;
-    const S = ["s"];
+  /* ---------- Find-hubs stepper (three-chain map) ---------- */
+  function hubSteps() {
+    const k = 3;
+    const B = 100;
+    const S = ["x", "y", "z"];
     const dist = {};
     const pred = {};
-    G.nodes.forEach((n) => {
+    HUB.nodes.forEach((n) => {
       dist[n.id] = INF;
     });
-    dist.s = 0;
-    const adj = adjList();
+    S.forEach((id) => {
+      dist[id] = 0;
+    });
+    const adj = adjList(HUB);
     const steps = [];
-    let W = new Set(S);
-    let prev = [...S];
+    const W = new Set(S);
+    let layer = [...S];
+
+    function sizesNow() {
+      const sizes = { x: 0, y: 0, z: 0 };
+      W.forEach((v) => {
+        let x = v;
+        const seen = new Set();
+        while (x && !seen.has(x)) {
+          seen.add(x);
+          if (S.includes(x)) {
+            sizes[x] += 1;
+            break;
+          }
+          x = pred[x];
+        }
+      });
+      return sizes;
+    }
 
     function snap(caption, extra) {
+      const sizes = extra && extra.sizes ? extra.sizes : sizesNow();
       steps.push({
+        graph: HUB,
         dist: { ...dist },
         pred: { ...pred },
-        complete: [...W].filter((v) => dist[v] === TRUE_D[v]),
-        frontier: [...W],
+        complete: [...S],
+        frontier: [...W].filter((id) => !S.includes(id)),
         caption,
+        k,
+        starts: [...S],
+        touched: [...W],
+        layer: extra && extra.layer ? extra.layer : [...layer],
+        sizes,
         ...extra,
       });
     }
 
-    snap("Find hubs, toy setting: 2 shouts from s, ignore guesses past 20. Touched so far: just s.");
-    let worldA = false;
-    for (let i = 1; i <= k; i++) {
+    snap("Starts x, y, z are already locked (guess 0). k = 3 offer-rounds. Crowd threshold = k × 3 starts = 9. Touched so far: just the starts.", {
+      kind: "init",
+      action: "Ready — 3 offer-rounds from x, y, z. No PICK.",
+      why: "This is not Dijkstra. We will not scan a waiting list for the closest leftover. We will offer every road out of the current layer, then the next layer, three times. Then we count who owns whom.",
+      layer: [...S],
+    });
+
+    for (let round = 1; round <= k; round++) {
       const curr = [];
-      prev.forEach((u) => {
-        (adj[u] || []).forEach((e) => {
-          const cand = dist[u] + e.w;
-          if (cand <= dist[e.v]) {
-            dist[e.v] = cand;
-            pred[e.v] = u;
-            if (cand < B) {
-              curr.push(e.v);
-              W.add(e.v);
-            }
-            snap("Shout " + i + ": offer " + e.u + " → " + e.v + ". Guess " + cand + ". Touched: " + [...W].join(", ") + ".", {
-              current: u,
-              hotEdge: e,
-            });
-          }
+      const roads = [];
+      layer.forEach((u) => {
+        (adj[u] || []).forEach((e) => roads.push(e));
+      });
+      if (!roads.length) {
+        snap("Offer-round " + round + ": this layer has no outgoing roads. Nothing to offer.", {
+          kind: "offer",
+          action: "OFFER-round " + round + " — layer has no roads",
+          why: "The layer is the places we reached in the previous round. If they have no unused outgoing roads, this round adds nobody.",
+          layer: [...layer],
         });
-      });
-      if (W.size > k * S.length) {
-        worldA = true;
-        snap(
-          "End of shout " +
-            i +
-            ". We touched " +
-            W.size +
-            " places, starting from 1 boundary place, with k = 2. That is already a crowd compared with the boundary, so the whole boundary can act as hubs. Here that is just s. We do not need to inspect family trees."
-        );
-        break;
       }
-      snap("End of shout " + i + ". Touched " + W.size + " places, still not a crowd. Shout again.");
-      prev = curr;
-    }
-    if (!worldA) {
-      const sizes = {};
-      G.nodes.forEach((n) => {
-        sizes[n.id] = 0;
-      });
-      [...W].forEach((v) => {
-        let x = v;
-        const seen = new Set();
-        while (x && W.has(x) && !seen.has(x)) {
-          sizes[x] = (sizes[x] || 0) + 1;
-          seen.add(x);
-          if (S.includes(x)) break;
-          x = pred[x];
+      roads.forEach((e, idx) => {
+        const cand = dist[e.u] + e.w;
+        if (cand <= dist[e.v] && cand < B) {
+          dist[e.v] = cand;
+          pred[e.v] = e.u;
+          curr.push(e.v);
+          W.add(e.v);
         }
+        snap(
+          "OFFER-round " +
+            round +
+            ", road " +
+            (idx + 1) +
+            " of " +
+            roads.length +
+            ": " +
+            e.u +
+            " → " +
+            e.v +
+            ". Guess[" +
+            e.v +
+            "] = " +
+            dist[e.v] +
+            ". parent[" +
+            e.v +
+            "] = " +
+            e.u +
+            ".",
+          {
+            kind: "offer",
+            current: e.u,
+            hotEdge: e,
+            action: "OFFER-round " + round + " (" + (idx + 1) + " of " + roads.length + ") — no PICK",
+            why:
+              "Same offer as in your Dijkstra. We do not lock " +
+              e.v +
+              ". It just joins the touched set. After this round we will check touched vs 9.",
+            layer: [...layer],
+          }
+        );
       });
-      const P = S.filter((u) => (sizes[u] || 0) >= k);
+      const crowd = W.size > k * S.length;
       snap(
-        "The other case: family trees from the boundary. " +
-          S.map((u) => u + " currently owns " + (sizes[u] || 0) + " place(s)").join("; ") +
-          ". Hubs = {" +
-          (P.join(", ") || "none") +
-          "} (roots that own at least " +
-          k +
-          " places)."
+        "End of offer-round " +
+          round +
+          ". Touched " +
+          W.size +
+          " places. Threshold is 9. " +
+          (crowd ? "Already a crowd — we would keep every start and stop." : "Not a crowd yet (" + W.size + " ≤ 9), so we continue."),
+        {
+          kind: crowd ? "crowd" : "round",
+          action: "Check: touched " + W.size + " vs threshold 9",
+          why: crowd
+            ? "Early exit: the start list is already small compared with how many places we reached. Keep x, y, and z. No counting."
+            : "We still have offer-rounds left, or we will count parent[] after round 3. Layer for the next round = the neighbours we just reached.",
+          layer: [...curr],
+        }
       );
-    } else {
-      snap(
-        "The other case, for contrast: if we had only touched a few places, we would follow parent pointers and keep only roots whose family tree has at least 2 places. Those roots are the hubs. The next step of the algorithm expands only from hubs, not from every boundary place."
-      );
+      if (crowd) return steps;
+      layer = curr;
     }
+
+    snap("Offer-rounds done. Follow parent[] from every touched place until you hit a start. That start owns this place. Count.", {
+      kind: "count",
+      action: "Count: follow parent[] back to a start",
+      why: "parent is the green arrows: p←x, q←p, r←q, u←y, v←u, w←z. Each place adds 1 to exactly one start. A start is a hub if it owns at least k = 3 places (including itself).",
+      layer: [],
+    });
+
+    const sizes = sizesNow();
+    ["x", "y", "z"].forEach((id) => {
+      const names = { x: "x, p, q, r", y: "y, u, v", z: "z, w" };
+      snap(
+        "Start " +
+          id +
+          " owns " +
+          sizes[id] +
+          " place(s): " +
+          names[id] +
+          ". Hub test: own at least k = 3? " +
+          (sizes[id] >= k ? "yes — keep " + id : "no — drop " + id) +
+          ".",
+        {
+          kind: "count",
+          action: "Count " + id + ": owns " + sizes[id] + (sizes[id] >= k ? " ≥ 3 → hub" : " < 3 → drop"),
+          why:
+            id === "z"
+              ? "w is only one road from z. After 3 offer-rounds, w already has the right guess. We do not keep z as a source. Remaining unfinished work (if this map were longer) would go through x and y, the long chains."
+              : id + "’s chain is long enough that we treat " + id + " as a hub: later work still starts from here, not from every gold place.",
+          sizes,
+          layer: [],
+        }
+      );
+    });
+
+    snap("Keep hubs {x, y}. Drop z. The rest of the algorithm only uses x and y as starts. We never ranked p, q, r, u, v, w on a waiting list.", {
+      kind: "done",
+      action: "Done — keep x, y. Drop z.",
+      why: "That is change 1 from chapter 8: the start list shrank from 3 to 2 without a PICK. Change 2 (take a handful of closest hubs, not one) comes next.",
+      hubs: ["x", "y"],
+      dropped: ["z"],
+      sizes,
+      layer: [],
+    });
     return steps;
   }
-  bindStepper(pivotSteps(), "pvSvg", "pvStatus", "pvCaption", "pvPrev", "pvNext", "pvReset");
+
+  function fillHubPanel(st) {
+    const action = $("pvAction");
+    const meta = $("pvMeta");
+    const layerEl = $("pvLayer");
+    const parentsEl = $("pvParents");
+    const sizesEl = $("pvSizes");
+    const hubsEl = $("pvHubs");
+    const why = $("pvWhy");
+    if (!action) return;
+    action.textContent = st.action || "";
+    action.className = "dij-action " + (st.kind === "offer" ? "offer" : st.kind === "done" ? "done" : "pick");
+    if (why) why.textContent = st.why || "";
+    const th = (st.k || 3) * (st.starts ? st.starts.length : 3);
+    if (meta) {
+      meta.textContent =
+        "k=" +
+        (st.k || 3) +
+        "   starts=" +
+        (st.starts || []).join(",") +
+        "   touched=" +
+        (st.touched || []).length +
+        "   threshold=" +
+        th;
+    }
+    if (layerEl) layerEl.textContent = (st.layer && st.layer.length ? st.layer.join(", ") : "—");
+    if (parentsEl) {
+      const pred = st.pred || {};
+      const bits = Object.keys(pred)
+        .sort()
+        .map((id) => id + "←" + pred[id]);
+      parentsEl.textContent = bits.length ? bits.join("   ") : "none yet";
+    }
+    if (sizesEl) {
+      sizesEl.innerHTML = "";
+      const sizes = st.sizes || {};
+      ["x", "y", "z"].forEach((id) => {
+        const li = document.createElement("li");
+        const n = sizes[id] || 0;
+        const keep = n >= (st.k || 3);
+        if (st.kind === "done" || st.kind === "count") {
+          if (keep) li.classList.add("next");
+        }
+        li.innerHTML = "<span>" + id + "</span><span>" + n + "</span>";
+        const tag = document.createElement("span");
+        tag.className = "tag";
+        tag.textContent = st.kind === "init" || st.kind === "offer" || st.kind === "round" ? "" : keep ? "hub" : "drop";
+        if (tag.textContent) li.appendChild(tag);
+        sizesEl.appendChild(li);
+      });
+    }
+    if (hubsEl) {
+      if (st.hubs && st.hubs.length) hubsEl.textContent = st.hubs.join(", ");
+      else if (st.kind === "crowd") hubsEl.textContent = "all starts (early exit)";
+      else hubsEl.textContent = "not decided yet";
+    }
+  }
+
+  bindStepper(hubSteps(), "pvSvg", "pvStatus", "pvCaption", "pvPrev", "pvNext", "pvReset", fillHubPanel);
+
+  /* ---------- Chapter 8: handful vs one ---------- */
+  (function handfulDemo() {
+    const list = $("handfulList");
+    const note = $("hfNote");
+    if (!list) return;
+    const items = [
+      { id: "b", t: 2 },
+      { id: "g", t: 3 },
+      { id: "a", t: 4 },
+      { id: "f", t: 7 },
+      { id: "c", t: 10 },
+      { id: "d", t: 12 },
+      { id: "h", t: 15 },
+      { id: "e", t: 20 },
+    ];
+    function render(taken, mode) {
+      list.innerHTML = "";
+      items.forEach((it) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "place" + (taken.indexOf(it.id) >= 0 ? (mode === "new" ? " batch" : " taken") : "");
+        b.innerHTML = it.id + "<span class=\"t\">guess " + it.t + "</span>";
+        list.appendChild(b);
+      });
+      if (!taken.length) {
+        note.textContent = "Each tile is a leftover place and its guess. Nothing is locked yet.";
+      } else if (mode === "dij") {
+        note.textContent =
+          "Dijkstra PICK: only " +
+          taken[0] +
+          " (smallest guess). To do that it had to know who the single closest was — the ranking question.";
+      } else {
+        note.textContent =
+          "New PICK: the three closest (" +
+          taken.join(", ") +
+          "). The other five stay unsorted among themselves. Weaker question, cheaper.";
+      }
+    }
+    render([], "");
+    $("hfDij").addEventListener("click", () => {
+      const one = items.slice().sort((x, y) => x.t - y.t)[0].id;
+      render([one], "dij");
+    });
+    $("hfNew").addEventListener("click", () => {
+      const three = items
+        .slice()
+        .sort((x, y) => x.t - y.t)
+        .slice(0, 3)
+        .map((x) => x.id);
+      render(three, "new");
+    });
+    $("hfReset").addEventListener("click", () => render([], ""));
+  })();
 
   /* ---------- Worked walk-through ---------- */
   function walkSteps() {

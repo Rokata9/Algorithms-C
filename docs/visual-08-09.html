@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Visual — PICK, OFFER, layer, keep or drop</title>
+  <style>
+    :root {
+      --paper: #efe8dc;
+      --ink: #1c1712;
+      --muted: #6a6158;
+      --line: #d4c6b0;
+      --panel: #fffdf8;
+      --pick: #2c6a4f;
+      --pick-soft: #d5eadc;
+      --offer: #c9a227;
+      --offer-soft: #f3e3c0;
+      --hub: #2a5f73;
+      --drop: #8a7c72;
+      --hot: #b4451e;
+      --code-bg: #1c1814;
+      --code-ink: #f3eadc;
+      --code-cmt: #8a7d6c;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: ui-sans-serif, -apple-system, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: var(--paper);
+      font-size: 16px;
+    }
+    .page { max-width: 2920px; margin: 0 auto; padding: 20px 28px 72px; }
+    .narrow { max-width: 1080px; }
+    a { color: var(--hot); }
+    h2 {
+      font-family: Georgia, "Iowan Old Style", serif;
+      font-size: 1.55rem;
+      font-weight: 650;
+      margin: 0 0 12px;
+    }
+    h2 .n {
+      display: inline-grid;
+      place-items: center;
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: var(--ink);
+      color: var(--panel);
+      font-size: 0.95rem;
+      margin-right: 10px;
+      vertical-align: -4px;
+      font-family: ui-sans-serif, sans-serif;
+    }
+    .top {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 4px 0 14px;
+      border-bottom: 2px solid var(--line);
+      margin-bottom: 24px;
+      max-width: 1080px;
+    }
+    .top h1 {
+      font-family: Georgia, serif;
+      font-size: 1.7rem;
+      margin: 0;
+      font-weight: 650;
+    }
+    nav.jump { display: flex; gap: 6px; flex-wrap: wrap; }
+    nav.jump a {
+      text-decoration: none;
+      color: var(--ink);
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 11px;
+      font-size: 0.85rem;
+    }
+    .band { margin-bottom: 36px; scroll-margin-top: 12px; }
+    pre, code, .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+    pre {
+      margin: 0;
+      background: var(--code-bg);
+      color: var(--code-ink);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 0.8rem;
+      line-height: 1.4;
+    }
+    .cmt { color: var(--code-cmt); }
+    .kw { color: #e8b86a; }
+
+    .machines {
+      display: grid;
+      grid-template-columns: 1fr 40px 1fr;
+      gap: 8px;
+      align-items: stretch;
+    }
+    .machine {
+      background: var(--panel);
+      border: 2px solid var(--line);
+      border-radius: 14px;
+      padding: 12px 14px 14px;
+    }
+    .machine.pick { border-color: var(--pick); background: linear-gradient(#fffdf8, var(--pick-soft)); }
+    .machine.offer { border-color: var(--offer); background: linear-gradient(#fffdf8, var(--offer-soft)); }
+    .machine .tag {
+      display: inline-block;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 999px;
+      margin-bottom: 6px;
+    }
+    .machine.pick .tag { background: var(--pick); color: #fff; }
+    .machine.offer .tag { background: var(--offer); color: var(--ink); }
+    .machine h3 { font-family: Georgia, serif; font-size: 1.15rem; margin: 0 0 10px; }
+    .then { display: grid; place-items: center; font-size: 1.6rem; font-weight: 800; }
+    .cells { display: flex; gap: 6px; margin-bottom: 10px; }
+    .cell {
+      flex: 1;
+      background: #fff;
+      border: 1.5px solid var(--ink);
+      border-radius: 8px;
+      text-align: center;
+      padding: 6px 2px 5px;
+      position: relative;
+    }
+    .cell .id { font-family: Georgia, serif; font-size: 1.15rem; display: block; }
+    .cell .g { font-family: ui-monospace, monospace; color: var(--muted); font-size: 0.8rem; }
+    .cell.locked { background: var(--pick); border-color: var(--pick); color: #fff; }
+    .cell.locked .g { color: #d5eadc; }
+    .cell.min { outline: 3px solid var(--hot); background: #fff6ee; }
+    .cell .flag {
+      position: absolute;
+      top: -9px; left: 50%;
+      transform: translateX(-50%);
+      background: var(--hot);
+      color: #fff;
+      font-size: 0.62rem;
+      font-weight: 800;
+      padding: 1px 6px;
+      border-radius: 999px;
+    }
+    .offer-viz svg { width: 100%; height: 140px; display: block; }
+
+    .timelines { margin-top: 12px; display: grid; gap: 8px; }
+    .tl { display: grid; grid-template-columns: 140px 1fr; gap: 10px; align-items: center; }
+    .tl .name { font-weight: 800; color: var(--muted); font-size: 0.82rem; }
+    .track { display: flex; gap: 5px; flex-wrap: wrap; }
+    .track i {
+      font-style: normal;
+      font-weight: 700;
+      font-size: 0.78rem;
+      border-radius: 7px;
+      padding: 6px 8px;
+    }
+    .track .p { background: var(--pick); color: #fff; }
+    .track .o { background: var(--offer); color: var(--ink); }
+    .track .n { background: var(--hub); color: #fff; }
+    .track .x { color: var(--muted); }
+
+    .frames { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    .frame {
+      background: var(--panel);
+      border: 1.5px solid var(--offer);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .frame header {
+      background: var(--offer);
+      padding: 6px 10px;
+      font-weight: 800;
+      font-size: 0.82rem;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .frame header .sub { font-weight: 600; font-family: ui-monospace, monospace; font-size: 0.75rem; }
+    .frame svg { width: 100%; height: auto; display: block; background: #fbf7ef; }
+    .layer-eq {
+      margin-top: 10px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 12px;
+      align-items: center;
+    }
+    .eq-box {
+      background: var(--offer-soft);
+      border: 1.5px solid var(--offer);
+      border-radius: 10px;
+      padding: 8px 12px;
+      text-align: center;
+    }
+    .eq-box .lab { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.1em; color: var(--muted); }
+    .eq-box .val { font-family: Georgia, serif; font-size: 1.05rem; margin-top: 2px; }
+    .eq-sign { font-size: 1.4rem; font-weight: 800; color: var(--offer); }
+
+    .flow-wrap {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 6px;
+    }
+    .flow-wrap svg { width: 100%; height: auto; display: block; }
+
+    .bar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+    button {
+      font: inherit;
+      font-weight: 700;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      padding: 7px 14px;
+      cursor: pointer;
+    }
+    button.primary { background: var(--hot); color: #fff; border-color: var(--hot); }
+    button:disabled { opacity: 0.35; cursor: default; }
+    .dots { display: flex; gap: 4px; flex-wrap: wrap; }
+    .dots i {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #cfc4b4;
+      font-style: normal;
+      display: block;
+      cursor: pointer;
+    }
+    .dots i.on { background: var(--hot); }
+    .dots i.offer { background: var(--offer); }
+    .dots i.on.offer { background: var(--hot); }
+
+    .map-row {
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      gap: 12px;
+      align-items: start;
+    }
+    .map-frame {
+      background: var(--panel);
+      border: 1.5px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .map-frame svg { width: 100%; height: auto; display: block; }
+    .hud {
+      display: grid;
+      gap: 10px;
+    }
+    .hud > div {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px 10px;
+    }
+    .hud .lab {
+      font-size: 0.66rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+    .chip {
+      min-width: 28px; height: 28px;
+      border-radius: 50%;
+      display: grid; place-items: center;
+      font-family: Georgia, serif;
+      font-size: 0.85rem;
+      border: 2px solid var(--offer);
+      background: var(--offer-soft);
+    }
+    .chip.empty { border-style: dashed; color: var(--muted); background: transparent; }
+    .act { font-family: Georgia, serif; font-size: 1.05rem; margin-top: 6px; }
+    .meter { display: flex; gap: 3px; flex-wrap: wrap; }
+    .meter b {
+      width: 20px; height: 20px;
+      border-radius: 4px;
+      background: #efe6d6;
+      border: 1px solid var(--line);
+      font-size: 0.62rem;
+      display: grid; place-items: center;
+      color: transparent;
+    }
+    .meter b.on { background: var(--offer); border-color: #a8861c; color: var(--ink); }
+    .meter-cap { margin: 4px 0 0; font-family: ui-monospace, monospace; color: var(--muted); font-size: 0.8rem; }
+    .stacks { display: grid; gap: 4px; margin-top: 6px; }
+    .stack-row { display: flex; align-items: center; gap: 4px; }
+    .stack-row .who { width: 18px; font-family: Georgia, serif; font-size: 0.95rem; font-weight: 700; }
+    .tok {
+      width: 18px; height: 18px;
+      border-radius: 3px;
+      background: var(--offer);
+      display: grid; place-items: center;
+      font-size: 0.62rem;
+      font-weight: 800;
+    }
+    .tok.start { background: var(--pick); color: #fff; }
+    .kline { width: 2px; height: 18px; background: var(--hot); }
+    .verdict { margin-left: auto; font-weight: 800; font-size: 0.72rem; letter-spacing: 0.06em; min-width: 42px; }
+    .verdict.keep { color: var(--hub); }
+    .verdict.drop { color: var(--drop); }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      margin-top: 6px;
+    }
+    .dot {
+      display: inline-block;
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      margin-right: 5px;
+      vertical-align: middle;
+    }
+
+    .forest { display: grid; grid-template-columns: 1.5fr 1.2fr 0.7fr 0.7fr; gap: 10px; }
+    .tree {
+      background: var(--panel);
+      border: 3px solid var(--line);
+      border-radius: 12px;
+      padding: 10px;
+    }
+    .tree.keep { border-color: var(--hub); }
+    .tree.drop { border-color: var(--drop); }
+    .tree .stamp { font-weight: 800; letter-spacing: 0.1em; font-size: 0.68rem; margin-bottom: 8px; }
+    .tree.keep .stamp { color: var(--hub); }
+    .tree.drop .stamp { color: var(--drop); }
+    .nest { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .ball {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      display: grid; place-items: center;
+      font-family: Georgia, serif;
+      font-size: 0.95rem;
+      border: 2px solid var(--ink);
+      background: var(--offer);
+    }
+    .ball.root { background: var(--pick); color: #fff; border-color: var(--pick); }
+    .tree.keep .ball.root { background: var(--hub); border-color: var(--hub); }
+    .tree.drop .ball.root { background: var(--drop); border-color: var(--drop); }
+    .kids { display: flex; gap: 10px; justify-content: center; }
+    .ghost .ball { background: #ebe4d8; color: var(--muted); border-style: dashed; }
+    .stem { width: 2px; height: 8px; background: var(--pick); }
+    .tree.drop .stem { background: var(--drop); }
+
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .why-viz {
+      background: var(--panel);
+      border-radius: 12px;
+      border: 3px solid var(--line);
+      overflow: hidden;
+    }
+    .why-viz.keep { border-color: var(--hub); }
+    .why-viz.drop { border-color: var(--drop); }
+    .why-viz header {
+      padding: 7px 10px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      font-size: 0.75rem;
+    }
+    .why-viz.keep header { background: var(--hub); color: #fff; }
+    .why-viz.drop header { background: var(--drop); color: #fff; }
+    .why-viz svg { width: 100%; height: auto; display: block; }
+
+    .hf-bar { display: flex; gap: 8px; margin-bottom: 8px; }
+    .tiles { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; }
+    .tile {
+      background: var(--panel);
+      border: 2px solid var(--ink);
+      border-radius: 10px;
+      padding: 12px 4px 10px;
+      text-align: center;
+      position: relative;
+    }
+    .tile .id { font-family: Georgia, serif; font-size: 1.4rem; display: block; }
+    .tile .g { font-family: ui-monospace, monospace; color: var(--muted); font-size: 0.75rem; }
+    .tile.taken { background: var(--pick); color: #fff; border-color: var(--pick); }
+    .tile.taken .g { color: #d5eadc; }
+    .tile.batch { background: var(--hub); color: #fff; border-color: var(--hub); }
+    .tile.batch .g { color: #d3e6ee; }
+    .tile .crown {
+      position: absolute;
+      top: 4px; left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.58rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+    }
+    .bracket { height: 12px; margin: 0 0 4px; display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; }
+    .bracket i { display: block; height: 10px; }
+    .bracket i.on { border: 2px solid var(--hub); border-bottom: none; border-radius: 8px 8px 0 0; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="top">
+      <h1>PICK · OFFER · layer · keep or drop</h1>
+      <nav class="jump">
+        <a href="#moves">moves</a>
+        <a href="#layer">layer</a>
+        <a href="#flow">flow</a>
+        <a href="#map">map</a>
+        <a href="#own">own</a>
+        <a href="#keep">keep / drop</a>
+        <a href="#handful">handful</a>
+        <a href="index.html">← lesson</a>
+      </nav>
+    </header>
+
+    <section class="band narrow" id="moves">
+      <h2><span class="n">1</span>Two moves in your Dijkstra</h2>
+      <div class="machines">
+        <article class="machine pick">
+          <span class="tag">PICK</span>
+          <h3>Scan leftovers. Lock the smallest.</h3>
+          <div class="cells">
+            <div class="cell locked"><span class="id">s</span><span class="g">0</span></div>
+            <div class="cell min"><span class="flag">MIN</span><span class="id">b</span><span class="g">2</span></div>
+            <div class="cell"><span class="id">a</span><span class="g">4</span></div>
+            <div class="cell"><span class="id">c</span><span class="g">?</span></div>
+            <div class="cell"><span class="id">d</span><span class="g">?</span></div>
+            <div class="cell"><span class="id">e</span><span class="g">?</span></div>
+          </div>
+          <pre><span class="kw">for</span> (<span class="kw">int</span> i = 0; i &lt; PLACE_COUNT; i++) {
+    <span class="kw">if</span> (waiting[i] &lt; value) { u = i; value = waiting[i]; }
+}
+waiting_n--;
+waiting[u] = HUGE;          <span class="cmt">/* lock — GREEN */</span></pre>
+        </article>
+        <div class="then" aria-hidden="true">→</div>
+        <article class="machine offer">
+          <span class="tag">OFFER</span>
+          <h3>Roads out of u. Gold is not a lock.</h3>
+          <div class="offer-viz">
+            <svg viewBox="0 0 520 140" aria-hidden="true">
+              <defs>
+                <marker id="arrK" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                  <path d="M0,0 L8,4 L0,8 z" fill="#1c1712" />
+                </marker>
+              </defs>
+              <line x1="150" y1="70" x2="248" y2="32" stroke="#1c1712" stroke-width="2" marker-end="url(#arrK)" />
+              <line x1="150" y1="70" x2="248" y2="70" stroke="#b4451e" stroke-width="3" marker-end="url(#arrK)" />
+              <line x1="150" y1="70" x2="248" y2="108" stroke="#1c1712" stroke-width="2" marker-end="url(#arrK)" />
+              <circle cx="128" cy="70" r="18" fill="#2c6a4f" />
+              <text x="128" y="75" text-anchor="middle" fill="#fff" font-size="14" font-family="Georgia,serif">b</text>
+              <circle cx="274" cy="32" r="16" fill="#c9a227" stroke="#8a6a10" stroke-width="2" />
+              <text x="274" y="37" text-anchor="middle" font-size="13" font-family="Georgia,serif">a</text>
+              <circle cx="274" cy="70" r="16" fill="#fffdf8" stroke="#1c1712" stroke-width="2" />
+              <text x="274" y="75" text-anchor="middle" font-size="13" font-family="Georgia,serif">c</text>
+              <circle cx="274" cy="108" r="16" fill="#fffdf8" stroke="#1c1712" stroke-width="2" />
+              <text x="274" y="113" text-anchor="middle" font-size="13" font-family="Georgia,serif">d</text>
+              <text x="300" y="37" fill="#5c5348" font-size="12" font-family="ui-monospace,monospace">4→3</text>
+              <text x="300" y="75" fill="#5c5348" font-size="12" font-family="ui-monospace,monospace">?→10</text>
+              <text x="300" y="113" fill="#5c5348" font-size="12" font-family="ui-monospace,monospace">?→12</text>
+            </svg>
+          </div>
+          <pre><span class="kw">for</span> (<span class="kw">int</span> i = 0; i &lt; out_n[u]; i++) {
+    <span class="kw">int</span> v = out[u][i].to, w = out[u][i].time;
+    <span class="kw">if</span> (guess[u] + w &lt; guess[v]) {
+        guess[v] = guess[u] + w;  <span class="cmt">/* GOLD */</span>
+        waiting[v] = guess[v];
+    }
+}</pre>
+        </article>
+      </div>
+      <div class="timelines">
+        <div class="tl">
+          <div class="name">Your Dijkstra</div>
+          <div class="track">
+            <i class="p">PICK s</i><i class="o">OFFER s</i>
+            <i class="p">PICK b</i><i class="o">OFFER b</i>
+            <i class="p">PICK a</i><i class="o">OFFER a</i>
+            <i class="x">one PICK per place</i>
+          </div>
+        </div>
+        <div class="tl">
+          <div class="name">This page</div>
+          <div class="track">
+            <i class="p">starts locked</i>
+            <i class="o">OFFER 1</i><i class="o">OFFER 2</i><i class="o">OFFER 3</i>
+            <i class="n">count → keep or drop</i>
+            <i class="x">no PICK in between</i>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="band narrow" id="layer">
+      <h2><span class="n">2</span>A layer = the u’s we OFFER from, together</h2>
+      <div class="frames">
+        <div class="frame">
+          <header>Round 1 <span class="sub">{x,y,z,q}</span></header>
+          <svg id="fr1" viewBox="0 0 760 420" role="img" aria-label="Offer round 1"></svg>
+        </div>
+        <div class="frame">
+          <header>Round 2 <span class="sub">{a,g,j,k}</span></header>
+          <svg id="fr2" viewBox="0 0 760 420" role="img" aria-label="Offer round 2"></svg>
+        </div>
+        <div class="frame">
+          <header>Round 3 <span class="sub">{b,h}</span></header>
+          <svg id="fr3" viewBox="0 0 760 420" role="img" aria-label="Offer round 3"></svg>
+        </div>
+      </div>
+      <div class="layer-eq">
+        <div class="eq-box">
+          <div class="lab">LAYER</div>
+          <div class="val">the current set of u</div>
+        </div>
+        <div class="eq-sign">=</div>
+        <div class="eq-box">
+          <div class="lab">YOUR INNER LOOP</div>
+          <div class="val" style="font-family:ui-monospace,monospace;font-size:0.92rem">for (i = 0; i &lt; out_n[<b style="color:#c9a227">u</b>]; i++)</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="band" id="flow">
+      <h2><span class="n">3</span>After k OFFER rounds</h2>
+      <div class="flow-wrap">
+        <svg viewBox="0 0 2860 430" role="img" aria-label="Find hubs flowchart">
+          <defs>
+            <marker id="fArr" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+              <path d="M0,0 L12,6 L0,12 z" fill="#1c1712" />
+            </marker>
+          </defs>
+          <rect x="30" y="40" width="280" height="100" rx="14" fill="#d5eadc" stroke="#2c6a4f" stroke-width="3" />
+          <text x="170" y="82" text-anchor="middle" font-size="20" font-weight="700" font-family="Georgia,serif">starts locked</text>
+          <text x="170" y="112" text-anchor="middle" font-size="16" font-family="ui-monospace,monospace">{x, y, z, q}</text>
+          <line x1="310" y1="90" x2="368" y2="90" stroke="#1c1712" stroke-width="2.5" marker-end="url(#fArr)" />
+          <rect x="380" y="40" width="280" height="100" rx="14" fill="#f3e3c0" stroke="#c9a227" stroke-width="3" />
+          <text x="520" y="82" text-anchor="middle" font-size="20" font-weight="700" font-family="Georgia,serif">layer = starts</text>
+          <text x="520" y="112" text-anchor="middle" font-size="16" font-family="ui-monospace,monospace">k = 3 rounds</text>
+          <line x1="660" y1="90" x2="718" y2="90" stroke="#1c1712" stroke-width="2.5" marker-end="url(#fArr)" />
+          <rect x="730" y="24" width="520" height="132" rx="14" fill="#f3e3c0" stroke="#c9a227" stroke-width="3" />
+          <text x="990" y="58" text-anchor="middle" font-size="20" font-weight="700" font-family="Georgia,serif">OFFER from every u in layer</text>
+          <text x="990" y="92" text-anchor="middle" font-size="15" font-family="ui-monospace,monospace">for u in layer</text>
+          <text x="990" y="116" text-anchor="middle" font-size="15" font-family="ui-monospace,monospace">    for i &lt; out_n[u]:  offer(u → v)</text>
+          <text x="990" y="140" text-anchor="middle" font-size="15" font-family="ui-monospace,monospace">parent[v] = u     next_layer ← v</text>
+          <line x1="1250" y1="90" x2="1310" y2="90" stroke="#1c1712" stroke-width="2.5" marker-end="url(#fArr)" />
+          <polygon points="1480,90 1600,160 1480,230 1360,160" fill="#fffdf8" stroke="#b4451e" stroke-width="3" />
+          <text x="1480" y="154" text-anchor="middle" font-size="16" font-weight="700">touched &gt; 12 ?</text>
+          <text x="1480" y="176" text-anchor="middle" font-size="13" fill="#6a6158">k × |starts|</text>
+          <line x1="1600" y1="160" x2="1710" y2="70" stroke="#c5bdb3" stroke-width="2" marker-end="url(#fArr)" />
+          <text x="1648" y="100" fill="#8a7c72" font-size="14">yes</text>
+          <rect x="1720" y="24" width="280" height="90" rx="14" fill="#f0f0f0" stroke="#c5bdb3" stroke-width="2" stroke-dasharray="6 4" />
+          <text x="1860" y="62" text-anchor="middle" font-size="18" fill="#8a7c72" font-weight="700">KEEP ALL starts</text>
+          <text x="1860" y="88" text-anchor="middle" font-size="14" fill="#8a7c72">six-place map fires this</text>
+          <line x1="1480" y1="230" x2="1480" y2="278" stroke="#1c1712" stroke-width="2.5" marker-end="url(#fArr)" />
+          <text x="1508" y="258" font-size="14" font-weight="700">no — this map</text>
+          <rect x="1320" y="290" width="320" height="88" rx="14" fill="#f3e3c0" stroke="#c9a227" stroke-width="3" />
+          <text x="1480" y="328" text-anchor="middle" font-size="18" font-weight="700" font-family="Georgia,serif">layer = next_layer</text>
+          <text x="1480" y="356" text-anchor="middle" font-size="14" font-family="ui-monospace,monospace">neighbours we just reached</text>
+          <path d="M1320,334 H1080 V90" fill="none" stroke="#c9a227" stroke-width="3" marker-end="url(#fArr)" />
+          <text x="1090" y="220" fill="#8a6a10" font-size="14" font-weight="700">again, up to k=3</text>
+          <line x1="1640" y1="334" x2="1738" y2="334" stroke="#1c1712" stroke-width="2.5" marker-end="url(#fArr)" />
+          <rect x="1750" y="286" width="420" height="96" rx="14" fill="#d3e6ee" stroke="#2a5f73" stroke-width="3" />
+          <text x="1960" y="324" text-anchor="middle" font-size="18" font-weight="700" font-family="Georgia,serif">walk parent[] to a start</text>
+          <text x="1960" y="352" text-anchor="middle" font-size="15" font-family="ui-monospace,monospace">own[start] += 1   (includes itself)</text>
+          <line x1="2170" y1="334" x2="2268" y2="334" stroke="#1c1712" stroke-width="2.5" marker-end="url(#fArr)" />
+          <rect x="2280" y="250" width="250" height="70" rx="14" fill="#d3e6ee" stroke="#2a5f73" stroke-width="3" />
+          <text x="2405" y="294" text-anchor="middle" font-size="22" font-weight="800" fill="#2a5f73">own ≥ 3  KEEP</text>
+          <rect x="2280" y="338" width="250" height="70" rx="14" fill="#e8e4de" stroke="#8a7c72" stroke-width="3" />
+          <text x="2405" y="382" text-anchor="middle" font-size="22" font-weight="800" fill="#8a7c72">own &lt; 3  DROP</text>
+        </svg>
+      </div>
+    </section>
+
+    <section class="band narrow" id="map">
+      <h2><span class="n">4</span>The whole map — press Next</h2>
+      <div class="bar">
+        <button type="button" id="prev">Back</button>
+        <button type="button" class="primary" id="next">Next</button>
+        <button type="button" id="reset">Reset</button>
+        <div class="dots" id="dots"></div>
+      </div>
+      <div class="map-row">
+        <div>
+          <div class="map-frame">
+            <svg id="bigMap" viewBox="0 0 760 420" role="img" aria-label="Connected map"></svg>
+          </div>
+          <div class="legend">
+            <span><i class="dot" style="background:#2c6a4f"></i>start, already locked</span>
+            <span><i class="dot" style="background:#c9a227"></i>touched, not locked</span>
+            <span><i class="dot" style="background:#2a5f73"></i>KEEP</span>
+            <span><i class="dot" style="background:#8a7c72"></i>DROP</span>
+            <span>gold ring = layer</span>
+            <span>green arrow = parent[]</span>
+          </div>
+        </div>
+        <aside class="hud">
+          <div>
+            <div class="lab">CODE</div>
+            <pre id="hudCode" style="min-height:88px"></pre>
+          </div>
+          <div>
+            <div class="lab">LAYER</div>
+            <div class="chips" id="hudLayer"></div>
+            <div class="act" id="hudAct">—</div>
+          </div>
+          <div>
+            <div class="lab">TOUCHED / 12  ·  OWN vs k=3</div>
+            <div class="meter" id="hudMeter"></div>
+            <p class="meter-cap" id="hudMeta"></p>
+            <div class="stacks" id="hudStacks"></div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="band narrow" id="own">
+      <h2><span class="n">5</span>parent[] is a forest. Count the boxes.</h2>
+      <div class="forest">
+        <div class="tree keep">
+          <div class="stamp">KEEP · 4 ≥ 3</div>
+          <div class="nest">
+            <div class="ball root">x</div>
+            <div class="stem"></div>
+            <div class="nest">
+              <div class="ball">a</div>
+              <div class="stem"></div>
+              <div class="nest">
+                <div class="ball">b</div>
+                <div class="stem"></div>
+                <div class="ball">c</div>
+              </div>
+            </div>
+          </div>
+          <div class="kids ghost" style="margin-top:10px">
+            <div class="nest"><div class="ball">d</div></div>
+            <div class="nest"><div class="ball">n</div></div>
+          </div>
+        </div>
+        <div class="tree keep">
+          <div class="stamp">KEEP · 4 ≥ 3</div>
+          <div class="nest">
+            <div class="ball root">y</div>
+            <div class="stem"></div>
+            <div class="nest">
+              <div class="ball">g</div>
+              <div class="stem"></div>
+              <div class="nest">
+                <div class="ball">h</div>
+                <div class="stem"></div>
+                <div class="ball">i</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="tree drop">
+          <div class="stamp">DROP · 2 &lt; 3</div>
+          <div class="nest">
+            <div class="ball root">z</div>
+            <div class="stem"></div>
+            <div class="ball">j</div>
+          </div>
+        </div>
+        <div class="tree drop">
+          <div class="stamp">DROP · 2 &lt; 3</div>
+          <div class="nest">
+            <div class="ball root">q</div>
+            <div class="stem"></div>
+            <div class="ball">k</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="band narrow" id="keep">
+      <h2><span class="n">6</span>Same map: why a short start leaves</h2>
+      <div class="pair">
+        <div class="why-viz keep">
+          <header>KEEP x — d, n, e, f, o still “?”</header>
+          <svg id="keepX" viewBox="0 0 760 420" role="img"></svg>
+        </div>
+        <div class="why-viz drop">
+          <header>DROP z — 3 OFFERs already covered z’s roads</header>
+          <svg id="dropZ" viewBox="0 0 760 420" role="img"></svg>
+        </div>
+      </div>
+    </section>
+
+    <section class="band narrow" id="handful">
+      <h2><span class="n">7</span>Later PICK: one vs a handful</h2>
+      <div class="hf-bar">
+        <button type="button" class="primary" id="hfDij">PICK 1</button>
+        <button type="button" id="hfNew">PICK 3</button>
+        <button type="button" id="hfReset">Reset</button>
+      </div>
+      <div class="bracket" id="hfBr"></div>
+      <div class="tiles" id="hfTiles"></div>
+    </section>
+  </div>
+
+  <script>
+(function () {
+  const INF = 1e9;
+  const K = 3;
+  const STARTS = ["x", "y", "z", "q"];
+  const THRESH = K * STARTS.length;
+  const R = 16;
+
+  const NODES = [
+    { id: "x", x: 64,  y: 78,  start: true },
+    { id: "a", x: 168, y: 58 },
+    { id: "b", x: 268, y: 82 },
+    { id: "c", x: 372, y: 58 },
+    { id: "d", x: 500, y: 42 },
+    { id: "e", x: 610, y: 38 },
+    { id: "f", x: 710, y: 58 },
+    { id: "n", x: 505, y: 128 },
+    { id: "o", x: 615, y: 148 },
+    { id: "y", x: 64,  y: 218, start: true },
+    { id: "g", x: 168, y: 238 },
+    { id: "h", x: 275, y: 218 },
+    { id: "i", x: 385, y: 242 },
+    { id: "z", x: 64,  y: 355, start: true },
+    { id: "j", x: 168, y: 375 },
+    { id: "q", x: 290, y: 368, start: true },
+    { id: "k", x: 400, y: 355 }
+  ];
+  const EDGES = [
+    { u: "x", v: "a", w: 1 },
+    { u: "a", v: "b", w: 1 },
+    { u: "b", v: "c", w: 1 },
+    { u: "c", v: "d", w: 1 },
+    { u: "c", v: "n", w: 1 },
+    { u: "d", v: "e", w: 1 },
+    { u: "e", v: "f", w: 1 },
+    { u: "n", v: "o", w: 1 },
+    { u: "n", v: "e", w: 1 },
+    { u: "y", v: "g", w: 1 },
+    { u: "g", v: "h", w: 1 },
+    { u: "h", v: "i", w: 1 },
+    { u: "z", v: "j", w: 1 },
+    { u: "q", v: "k", w: 1 },
+    { u: "a", v: "g", w: 1 },
+    { u: "j", v: "g", w: 1 },
+    { u: "k", v: "g", w: 1 },
+    { u: "b", v: "h", w: 1 },
+    { u: "b", v: "j", w: 1 },
+    { u: "c", v: "i", w: 1 },
+    { u: "i", v: "d", w: 1 },
+    { u: "i", v: "n", w: 1 }
+  ];
+  const byId = {};
+  NODES.forEach((n) => { byId[n.id] = n; });
+  const adj = {};
+  NODES.forEach((n) => { adj[n.id] = []; });
+  EDGES.forEach((e) => adj[e.u].push(e));
+
+  function el(name, attrs, text) {
+    const n = document.createElementNS("http://www.w3.org/2000/svg", name);
+    Object.keys(attrs || {}).forEach((k) => n.setAttribute(k, attrs[k]));
+    if (text != null) n.textContent = text;
+    return n;
+  }
+
+  function sizesOf(dist, pred) {
+    const sizes = { x: 0, y: 0, z: 0, q: 0 };
+    const members = { x: [], y: [], z: [], q: [] };
+    NODES.forEach((n) => {
+      if (dist[n.id] >= INF / 2) return;
+      let cur = n.id, guard = 0;
+      while (cur && guard++ < 24) {
+        if (STARTS.indexOf(cur) >= 0) {
+          sizes[cur] += 1;
+          members[cur].push(n.id);
+          break;
+        }
+        cur = pred[cur];
+      }
+    });
+    return { sizes, members };
+  }
+
+  function draw(svg, st) {
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    const defs = el("defs");
+    const mk = el("marker", { id: svg.id + "arr", markerWidth: "8", markerHeight: "8", refX: "7", refY: "4", orient: "auto" });
+    mk.appendChild(el("path", { d: "M0,0 L8,4 L0,8 z", fill: "#5c5348" }));
+    defs.appendChild(mk);
+    const mkH = el("marker", { id: svg.id + "arrH", markerWidth: "8", markerHeight: "8", refX: "7", refY: "4", orient: "auto" });
+    mkH.appendChild(el("path", { d: "M0,0 L8,4 L0,8 z", fill: "#2c6a4f" }));
+    defs.appendChild(mkH);
+    const mkHot = el("marker", { id: svg.id + "arrHot", markerWidth: "8", markerHeight: "8", refX: "7", refY: "4", orient: "auto" });
+    mkHot.appendChild(el("path", { d: "M0,0 L8,4 L0,8 z", fill: "#b4451e" }));
+    defs.appendChild(mkHot);
+    svg.appendChild(defs);
+
+    const layerSet = {};
+    (st.layer || []).forEach((id) => { layerSet[id] = 1; });
+    const hubSet = {};
+    (st.hubs || []).forEach((id) => { hubSet[id] = 1; });
+    const dropSet = {};
+    (st.dropped || []).forEach((id) => { dropSet[id] = 1; });
+    const firedSet = {};
+    (st.fired || []).forEach((e) => { firedSet[e.u + ">" + e.v] = 1; });
+    const hi = st.highlight;
+    const dimOf = (id) => (hi && hi.indexOf(id) < 0) ? "0.18" : "1";
+
+    EDGES.forEach((e) => {
+      const A = byId[e.u], B = byId[e.v];
+      const hot = (st.hot && st.hot.u === e.u && st.hot.v === e.v) || firedSet[e.u + ">" + e.v];
+      const isPar = st.pred && st.pred[e.v] === e.u;
+      const dx = B.x - A.x, dy = B.y - A.y, len = Math.hypot(dx, dy) || 1;
+      const x1 = A.x + (dx / len) * R, y1 = A.y + (dy / len) * R;
+      const x2 = B.x - (dx / len) * (R + 6), y2 = B.y - (dy / len) * (R + 6);
+      let stroke = "#8a7c72", sw = "1.6", mark = "url(#" + svg.id + "arr)", op = "0.55";
+      if (isPar) { stroke = "#2c6a4f"; sw = "2.6"; mark = "url(#" + svg.id + "arrH)"; op = "1"; }
+      if (hot) { stroke = "#b4451e"; sw = "3"; mark = "url(#" + svg.id + "arrHot)"; op = "1"; }
+      const g = el("g", { opacity: String(Math.min(parseFloat(dimOf(e.u)), parseFloat(dimOf(e.v))) * parseFloat(op)) });
+      g.appendChild(el("line", {
+        x1: x1, y1: y1, x2: x2, y2: y2,
+        stroke: stroke, "stroke-width": sw, "marker-end": mark
+      }));
+      g.appendChild(el("text", {
+        x: String((A.x + B.x) / 2), y: String((A.y + B.y) / 2 - 6),
+        fill: "#b4451e", "font-size": "10", "text-anchor": "middle",
+        "font-family": "ui-monospace, monospace"
+      }, String(e.w)));
+      svg.appendChild(g);
+    });
+
+    NODES.forEach((n) => {
+      const gval = st.dist[n.id];
+      const shown = (gval == null || gval >= INF / 2) ? "?" : String(gval);
+      let fill = "#fffdf8", stroke = "#1c1712", tfill = "#1c1712";
+      if (gval != null && gval < INF / 2 && !st.locked[n.id] && !n.start) { fill = "#c9a227"; stroke = "#8a6a10"; }
+      if (st.locked[n.id]) { fill = "#2c6a4f"; stroke = "#2c6a4f"; tfill = "#fff"; }
+      if (hubSet[n.id]) { fill = "#2a5f73"; stroke = "#2a5f73"; tfill = "#fff"; }
+      if (dropSet[n.id]) { fill = "#8a7c72"; stroke = "#8a7c72"; tfill = "#fff"; }
+      const g = el("g", { opacity: dimOf(n.id) });
+      if (layerSet[n.id]) {
+        g.appendChild(el("circle", {
+          cx: n.x, cy: n.y, r: String(R + 7),
+          fill: "none", stroke: "#c9a227", "stroke-width": "3"
+        }));
+      }
+      if (st.focus === n.id) {
+        g.appendChild(el("circle", {
+          cx: n.x, cy: n.y, r: String(R + 11),
+          fill: "none", stroke: "#b4451e", "stroke-width": "2"
+        }));
+      }
+      g.appendChild(el("circle", {
+        cx: n.x, cy: n.y, r: String(R), fill: fill, stroke: stroke,
+        "stroke-width": (st.hot && st.hot.u === n.id) ? "3" : "2"
+      }));
+      g.appendChild(el("text", {
+        x: n.x, y: n.y + 4, "text-anchor": "middle", fill: tfill,
+        "font-size": "13", "font-family": "Georgia, serif"
+      }, n.id));
+      g.appendChild(el("text", {
+        x: n.x, y: n.y + R + 12, "text-anchor": "middle", fill: "#5c5348",
+        "font-size": "10", "font-family": "ui-monospace, monospace"
+      }, shown));
+      svg.appendChild(g);
+    });
+  }
+
+  function emptyDist() {
+    const d = {};
+    NODES.forEach((n) => { d[n.id] = INF; });
+    return d;
+  }
+
+  const frames = [
+    {
+      dist: Object.assign(emptyDist(), { x: 0, y: 0, z: 0, q: 0, a: 1, g: 1, j: 1, k: 1 }),
+      pred: { a: "x", g: "y", j: "z", k: "q" },
+      locked: { x: 1, y: 1, z: 1, q: 1 },
+      layer: ["x", "y", "z", "q"],
+      fired: [{ u: "x", v: "a" }, { u: "y", v: "g" }, { u: "z", v: "j" }, { u: "q", v: "k" }]
+    },
+    {
+      dist: Object.assign(emptyDist(), { x: 0, y: 0, z: 0, q: 0, a: 1, g: 1, j: 1, k: 1, b: 2, h: 2 }),
+      pred: { a: "x", g: "y", j: "z", k: "q", b: "a", h: "g" },
+      locked: { x: 1, y: 1, z: 1, q: 1 },
+      layer: ["a", "g", "j", "k"],
+      fired: [{ u: "a", v: "b" }, { u: "g", v: "h" }, { u: "a", v: "g" }, { u: "j", v: "g" }, { u: "k", v: "g" }]
+    },
+    {
+      dist: Object.assign(emptyDist(), { x: 0, y: 0, z: 0, q: 0, a: 1, g: 1, j: 1, k: 1, b: 2, h: 2, c: 3, i: 3 }),
+      pred: { a: "x", g: "y", j: "z", k: "q", b: "a", h: "g", c: "b", i: "h" },
+      locked: { x: 1, y: 1, z: 1, q: 1 },
+      layer: ["b", "h"],
+      fired: [{ u: "b", v: "c" }, { u: "h", v: "i" }, { u: "b", v: "h" }, { u: "b", v: "j" }]
+    }
+  ];
+  draw(document.getElementById("fr1"), frames[0]);
+  draw(document.getElementById("fr2"), frames[1]);
+  draw(document.getElementById("fr3"), frames[2]);
+
+  function buildSteps() {
+    const dist = emptyDist();
+    const pred = {};
+    const locked = {};
+    STARTS.forEach((s) => { dist[s] = 0; locked[s] = true; });
+    let layer = STARTS.slice();
+    const steps = [];
+
+    function snap(extra) {
+      steps.push({
+        dist: Object.assign({}, dist),
+        pred: Object.assign({}, pred),
+        locked: Object.assign({}, locked),
+        layer: layer.slice(),
+        own: sizesOf(dist, pred),
+        ...extra
+      });
+    }
+
+    snap({
+      kind: "init",
+      action: "starts locked",
+      code: "guess[x]=guess[y]=guess[z]=guess[q]=0;\nlayer = {x, y, z, q};"
+    });
+
+    for (let round = 1; round <= K; round++) {
+      const roads = [];
+      layer.forEach((u) => { (adj[u] || []).forEach((e) => roads.push(e)); });
+      const newly = [];
+      const seenNew = {};
+      roads.forEach((e) => {
+        const old = dist[e.v];
+        const cand = dist[e.u] + e.w;
+        let improved = false;
+        if (cand < dist[e.v]) {
+          dist[e.v] = cand;
+          pred[e.v] = e.u;
+          improved = true;
+          if (!locked[e.v] && !seenNew[e.v]) {
+            seenNew[e.v] = 1;
+            newly.push(e.v);
+          }
+        }
+        snap({
+          kind: "offer",
+          hot: e,
+          action: improved
+            ? "OFFER  " + e.u + " → " + e.v + "  ·  " + (old >= INF / 2 ? "?" : old) + " → " + dist[e.v]
+            : "OFFER  " + e.u + " → " + e.v + "  ·  no change",
+          code: "/* round " + round + ", u = " + e.u + " */\n" +
+            "if (guess[" + e.u + "] + " + e.w + " < guess[" + e.v + "])\n" +
+            (improved ? "    guess[" + e.v + "] = " + dist[e.v] + ";  parent[" + e.v + "] = " + e.u + ";"
+                      : "    /* " + e.v + " already " + dist[e.v] + " */")
+        });
+      });
+      const offering = layer.slice();
+      layer = newly;
+      snap({
+        kind: "round",
+        action: "end of round " + round + "  ·  next = {" + (newly.join(", ") || "∅") + "}",
+        code: "next_layer = neighbours just reached;\nlayer = next_layer;",
+        layer: offering,
+        nextLayer: newly
+      });
+    }
+
+    const finalOwn = sizesOf(dist, pred);
+    snap({
+      kind: "count",
+      action: "walk parent[] → a start",
+      code: "for each touched v:\n    walk v → parent[v] → … until start s\n    own[s] += 1;",
+      layer: []
+    });
+
+    STARTS.forEach((id) => {
+      const n = finalOwn.sizes[id];
+      const keep = n >= K;
+      snap({
+        kind: "count",
+        focus: id,
+        hubs: keep ? [id] : [],
+        dropped: keep ? [] : [id],
+        action: (keep ? "KEEP " : "DROP ") + id + "  ·  owns " + n,
+        code: "own[" + id + "] = " + n + ";\n" + (keep ? ">= k  →  keep;" : "< k  →  drop;"),
+        layer: [],
+        own: finalOwn,
+        highlight: finalOwn.members[id]
+      });
+    });
+
+    snap({
+      kind: "done",
+      hubs: ["x", "y"],
+      dropped: ["z", "q"],
+      action: "sources  {x,y,z,q}  →  {x,y}",
+      code: "hubs = {x, y};",
+      layer: [],
+      own: finalOwn
+    });
+    return steps;
+  }
+
+  const steps = buildSteps();
+  let i = 0;
+  const svg = document.getElementById("bigMap");
+  const dots = document.getElementById("dots");
+  steps.forEach((_, idx) => {
+    const b = document.createElement("i");
+    if (steps[idx].kind === "offer") b.classList.add("offer");
+    b.addEventListener("click", () => { i = idx; show(); });
+    dots.appendChild(b);
+  });
+
+  function show() {
+    const st = steps[i];
+    draw(svg, st);
+    [...dots.children].forEach((d, idx) => d.classList.toggle("on", idx === i));
+    document.getElementById("hudCode").textContent = st.code || "";
+    document.getElementById("hudAct").textContent = st.action || "";
+    const layerEl = document.getElementById("hudLayer");
+    layerEl.innerHTML = "";
+    const Lset = st.layer || [];
+    if (!Lset.length) {
+      const c = document.createElement("div");
+      c.className = "chip empty";
+      c.textContent = "—";
+      layerEl.appendChild(c);
+    } else {
+      Lset.forEach((id) => {
+        const c = document.createElement("div");
+        c.className = "chip";
+        c.textContent = id;
+        layerEl.appendChild(c);
+      });
+    }
+    const touched = NODES.filter((n) => st.dist[n.id] < INF / 2);
+    const meter = document.getElementById("hudMeter");
+    meter.innerHTML = "";
+    for (let t = 0; t < THRESH; t++) {
+      const b = document.createElement("b");
+      if (t < touched.length) {
+        b.className = "on";
+        b.textContent = touched[t].id;
+      }
+      meter.appendChild(b);
+    }
+    document.getElementById("hudMeta").textContent = touched.length + " / " + THRESH;
+    const stacks = document.getElementById("hudStacks");
+    stacks.innerHTML = "";
+    STARTS.forEach((id) => {
+      const row = document.createElement("div");
+      row.className = "stack-row";
+      const who = document.createElement("div");
+      who.className = "who";
+      who.textContent = id;
+      row.appendChild(who);
+      const mem = (st.own.members[id] || []);
+      mem.forEach((m, idx) => {
+        if (idx === K) {
+          const line = document.createElement("div");
+          line.className = "kline";
+          row.appendChild(line);
+        }
+        const tok = document.createElement("div");
+        tok.className = "tok" + (STARTS.indexOf(m) >= 0 ? " start" : "");
+        tok.textContent = m;
+        row.appendChild(tok);
+      });
+      if (mem.length <= K) {
+        const line = document.createElement("div");
+        line.className = "kline";
+        row.appendChild(line);
+      }
+      const v = document.createElement("div");
+      v.className = "verdict";
+      if (st.kind === "count" || st.kind === "done") {
+        const keep = (st.own.sizes[id] || 0) >= K;
+        v.className += keep ? " keep" : " drop";
+        v.textContent = keep ? "KEEP" : "DROP";
+      }
+      row.appendChild(v);
+      stacks.appendChild(row);
+    });
+    document.getElementById("prev").disabled = i === 0;
+    document.getElementById("next").disabled = i === steps.length - 1;
+  }
+
+  document.getElementById("prev").onclick = function () { i = Math.max(0, i - 1); show(); };
+  document.getElementById("next").onclick = function () { i = Math.min(steps.length - 1, i + 1); show(); };
+  document.getElementById("reset").onclick = function () { i = 0; show(); };
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowRight") { i = Math.min(steps.length - 1, i + 1); show(); }
+    if (e.key === "ArrowLeft") { i = Math.max(0, i - 1); show(); }
+  });
+  show();
+
+  const doneDist = Object.assign(emptyDist(), {
+    x: 0, a: 1, b: 2, c: 3, y: 0, g: 1, h: 2, i: 3, z: 0, j: 1, q: 0, k: 1
+  });
+  const donePred = { a: "x", b: "a", c: "b", g: "y", h: "g", i: "h", j: "z", k: "q" };
+  const doneLocked = { x: 1, y: 1, z: 1, q: 1 };
+  const doneOwn = sizesOf(doneDist, donePred);
+  draw(document.getElementById("keepX"), {
+    dist: doneDist, pred: donePred, locked: doneLocked,
+    hubs: ["x"], layer: [], own: doneOwn,
+    highlight: ["x", "a", "b", "c", "d", "e", "f", "n", "o"]
+  });
+  draw(document.getElementById("dropZ"), {
+    dist: doneDist, pred: donePred, locked: doneLocked,
+    dropped: ["z"], layer: [], own: doneOwn,
+    highlight: ["z", "j"]
+  });
+
+  const items = [
+    { id: "b", t: 2 }, { id: "g", t: 3 }, { id: "a", t: 4 }, { id: "f", t: 7 },
+    { id: "c", t: 10 }, { id: "d", t: 12 }, { id: "h", t: 15 }, { id: "e", t: 20 }
+  ];
+  function renderHf(taken, mode) {
+    const br = document.getElementById("hfBr");
+    const tiles = document.getElementById("hfTiles");
+    br.innerHTML = "";
+    tiles.innerHTML = "";
+    items.forEach((it, idx) => {
+      const b = document.createElement("i");
+      if (mode === "new" && idx < 3) b.className = "on";
+      br.appendChild(b);
+      const t = document.createElement("div");
+      t.className = "tile";
+      if (taken.indexOf(it.id) >= 0) t.classList.add(mode === "new" ? "batch" : "taken");
+      const crown = taken.indexOf(it.id) >= 0
+        ? "<span class='crown'>" + (mode === "new" ? "HANDFUL" : "PICK") + "</span>"
+        : "";
+      t.innerHTML = crown + "<span class='id'>" + it.id + "</span><span class='g'>guess " + it.t + "</span>";
+      tiles.appendChild(t);
+    });
+  }
+  renderHf([], "");
+  document.getElementById("hfDij").onclick = function () { renderHf(["b"], "dij"); };
+  document.getElementById("hfNew").onclick = function () { renderHf(["b", "g", "a"], "new"); };
+  document.getElementById("hfReset").onclick = function () { renderHf([], ""); };
+})();
+  </script>
+</body>
+</html>
